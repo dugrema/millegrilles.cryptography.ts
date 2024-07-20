@@ -2,7 +2,7 @@
  * @returns Array of random bytes.
  * @param byteLen Length of the array to generate.
  */
-export function getRandom(byteLen: number) {
+export function getRandom(byteLen: number): Uint8Array {
     let abView: Uint8Array;
     if( typeof(window) !== 'undefined' && window.crypto) {
         // Browser

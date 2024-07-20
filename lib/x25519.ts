@@ -1,10 +1,10 @@
-import { getRandom } from './random';
 import { digest } from './digest';
 import { baseEncode, baseDecode } from './multiencoding';
 import { encryptChacha20Poly1305, decryptChacha20Poly1305 } from './encryption'
+import { generateKeypairEd5519 } from './ed25519';
 import _sodium from 'libsodium-wrappers';
 
-type DeriveSecretResult = {
+type SecretFromEd25519Result = {
     secret: Uint8Array,     // Secret value to use
     peer: string,           // Peer to save as the encrypted key
     peerBytes: Uint8Array,  // Byte value of the peer
@@ -17,7 +17,7 @@ type DeriveSecretResult = {
  * @param publicKey 
  * @returns The generated secret and x25519 public peer value to save as part of the encrypted key.
  */
-export async function secretFromEd25519(publicKey: Uint8Array) : Promise<DeriveSecretResult> {
+export async function secretFromEd25519(publicKey: Uint8Array) : Promise<SecretFromEd25519Result> {
     await _sodium.ready;
     const sodium = _sodium;
 
@@ -126,15 +126,4 @@ export async function decryptEd25519(key: string, privateKey: Uint8Array): Promi
     const cleartext = await decryptChacha20Poly1305(ciphertextTag, nonce, sharedSecret);
 
     return cleartext;
-}
-
-type Ed25519KeyPair = {public: Uint8Array, private: Uint8Array}
-
-async function generateKeypairEd5519(): Promise<Ed25519KeyPair> {
-    await _sodium.ready;
-    const sodium = _sodium;
-
-    const privateKey = getRandom(32);
-    const newKey = sodium.crypto_sign_seed_keypair(privateKey);
-    return {public: newKey.publicKey, private: newKey.privateKey};
 }
