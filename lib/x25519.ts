@@ -1,13 +1,8 @@
 import { getRandom } from './random';
 import { digest } from './digest';
-import { baseEncode } from './multiencoding';
+import { baseEncode, baseDecode } from './multiencoding';
+import { encryptChacha20Poly1305, decryptChacha20Poly1305 } from './encryption'
 import _sodium from 'libsodium-wrappers';
-
-// chiffrer_asymmetrique_ed25519
-// dechiffrer_asymmetrique_ed25519
-// convertir_public_ed25519_to_x25519
-// convertir_private_ed25519_to_x25519
-// detecter_version_cle
 
 type DeriveSecretResult = {
     secret: Uint8Array,     // Secret value to use
@@ -53,50 +48,93 @@ export async function secretFromEd25519(publicKey: Uint8Array) : Promise<DeriveS
 
 /**
  * Recalculates a shared secret previously generated from a public CA key. 
- * @param privateKey The CA or reference key to use to decrypt the value.
- * @param peerPublicKey Peer public key generated as the encrypted value of a shared secret.
+ * @param privateKey The Ed25519 private key used to decrypt the value.
+ * @param peerPublicKey X25519 public key generated as the encrypted value of a shared secret.
  * @returns Shared secret.
  */
-export async function secretFromEd25519Peer(privateKey: Uint8Array, peerPublicKey: Uint8Array): Promise<Uint8Array> {
+export async function secretFromEd25519PrivateX25519Peer(ed25519PrivateKey: Uint8Array, x25519PublicKey: Uint8Array): Promise<Uint8Array> {
     await _sodium.ready;
     const sodium = _sodium;
 
     // Convert the ed25519 values to x25519.
-    const x25519PublicKey = sodium.crypto_sign_ed25519_pk_to_curve25519(peerPublicKey);
-    const privateKeyFull = sodium.crypto_sign_seed_keypair(privateKey).privateKey;
+    const privateKeyFull = sodium.crypto_sign_seed_keypair(ed25519PrivateKey).privateKey;
     const x25519PrivateKey = sodium.crypto_sign_ed25519_sk_to_curve25519(privateKeyFull);
 
     // Recalculate and digest the shared secret.
     const sharedSecretKey = sodium.crypto_scalarmult(x25519PrivateKey, x25519PublicKey);
     const digestedSecret = await digest(sharedSecretKey, {digestName: 'blake2s-256', encoding: 'bytes'});
-    if(!ArrayBuffer.isView(digestedSecret)) throw new Error("wrong type");  // Verify return type
+    if(!ArrayBuffer.isView(digestedSecret)) throw new Error("wrong type");  // Check type
     
     return digestedSecret;
 }
 
-function convertPublicEd25519toX25519() {
-
+/**
+ * 
+ * @param pk Ed25519 public key
+ * @returns X25519 public key
+ */
+export async function convertPublicEd25519toX25519(pk: Uint8Array) {
+    await _sodium.ready;
+    const sodium = _sodium;
+    
+    return sodium.crypto_sign_ed25519_pk_to_curve25519(pk);
 }
 
-function convertPrivateEd25519ToX25519() {
+/**
+ * 
+ * @param sk Ed25519 private key
+ * @returns X25519 private key
+ */
+export async function convertPrivateEd25519ToX25519(sk: Uint8Array) {
+    await _sodium.ready;
+    const sodium = _sodium;
 
+    const privateKeyFull = sodium.crypto_sign_seed_keypair(sk).privateKey;
+    return sodium.crypto_sign_ed25519_sk_to_curve25519(privateKeyFull);
 }
 
-function encryptEd25519() {
+export async function encryptEd25519(secretKey: Uint8Array, publicKey: Uint8Array): Promise<string> {
+    // Obtenir une nouvelle cle peer pour le chiffrage du secret
+    const newKey = await secretFromEd25519(publicKey);
+    const publicPeer = newKey.peerBytes;
+    // Generate the nonce from the key
+    const nonce = (await digest(publicPeer, {digestName: 'blake2s-256', encoding: 'bytes'})).slice(0, 12);
+    if(!ArrayBuffer.isView(nonce)) throw new Error("digest - nonce format must be bytes");  // Check format
+    const ciphertext = await encryptChacha20Poly1305(secretKey, nonce, newKey.secret);
 
+    // Put key content in a buffer
+    const encryptedKeyBuffer = new Uint8Array(80);
+    encryptedKeyBuffer.set(newKey.peerBytes, 0); // 32 bytes x25519 public peer
+    encryptedKeyBuffer.set(ciphertext, 32);      // 32 bytes encrypted secret key (chacha20-poly1305) + 16 bytes authentication tag
+    const encryptedKey = baseEncode('base64', encryptedKeyBuffer);
+
+    return encryptedKey;
 }
 
-function decryptEd25519() {
+export async function decryptEd25519(key: string, privateKey: Uint8Array): Promise<Uint8Array> {
+    const keyBytes = baseDecode(key);
 
+    // Get shared secret to decrypt key
+    const publicPeer = keyBytes.slice(0, 32);
+    const sharedSecret = await secretFromEd25519PrivateX25519Peer(privateKey, publicPeer);
+
+    // Decrypt the key
+    const ciphertextTag = keyBytes.slice(32, 80);
+    const nonce = (await digest(publicPeer, {digestName: 'blake2s-256', encoding: 'bytes'})).slice(0, 12);
+    if(!ArrayBuffer.isView(nonce)) throw new Error("digest - nonce format must be bytes");  // Check format
+
+    const cleartext = await decryptChacha20Poly1305(ciphertextTag, nonce, sharedSecret);
+
+    return cleartext;
 }
 
 type Ed25519KeyPair = {public: Uint8Array, private: Uint8Array}
 
 async function generateKeypairEd5519(): Promise<Ed25519KeyPair> {
-    await _sodium.ready
-    const sodium = _sodium
+    await _sodium.ready;
+    const sodium = _sodium;
 
-    const privateKey = getRandom(32)
-    const newKey = sodium.crypto_sign_seed_keypair(privateKey)    
-    return {public: newKey.publicKey, private: newKey.privateKey}
+    const privateKey = getRandom(32);
+    const newKey = sodium.crypto_sign_seed_keypair(privateKey);
+    return {public: newKey.publicKey, private: newKey.privateKey};
 }

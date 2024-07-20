@@ -38,6 +38,15 @@ export function baseEncode(encoding: multibase.BaseName, value: Uint8Array): str
     }
 }
 
+/**
+ * Wrapper for multibase decoding.
+ * @param value Multibase encoded value.
+ * @returns Decoded bytes
+ */
+export function baseDecode(value: string): Uint8Array {
+    return multibase.decode(value)
+}
+
 type MultihashDecodeResult = {
     name: multihash.HashName,
     digest: Uint8Array,
