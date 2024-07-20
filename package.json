@@ -19,6 +19,7 @@
     "typescript": "5.5.3"
   },
   "dependencies": {
+    "@types/ed2curve": "^0.2.4",
     "bs58": "^6.0.0",
     "hash-wasm": "^4.11.0",
     "libsodium-wrappers": "0.7.14",
