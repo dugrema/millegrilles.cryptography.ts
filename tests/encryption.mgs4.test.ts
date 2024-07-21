@@ -37,11 +37,8 @@ test('encrypt-decrypt 100k', async () => {
 
     let decipher = await getMgs4Decipher(key, header);
     let clear1 = await decipher.update(output);
-    console.debug("Clear 1 ", clear1)
     let clear2 = await decipher.update(finalOutput);
-    console.debug("Clear 2 ", clear2)
     let clear3 = await decipher.finalize();
-    console.debug("Clear 3 ", clear3)
     expect(clear1.length).toBe(65519)
     expect(clear2).toBeNull()
     expect(clear3.length).toBe(34481)
