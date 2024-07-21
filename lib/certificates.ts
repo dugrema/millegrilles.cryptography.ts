@@ -76,7 +76,7 @@ export type MilleGrillesCertificateExtensions = {
 };
 
 /**
- * Wrapper for a X509 certificate.
+ * Wrapper for a X509 certificate. Adds MilleGrilles specific features.
  */
 export class CertificateWrapper {
     readonly certificate: X509Certificate;
@@ -114,6 +114,11 @@ export class CertificateWrapper {
     }
 };
 
+/**
+ * Extracts any MilleGrilles specific extensions with their meaning.
+ * @param certificate 
+ * @returns Extensions present in the certificate.
+ */
 function extractMillegrillesExtensions(certificate: X509Certificate): MilleGrillesCertificateExtensions {
     const exchanges = readExtensionListValue(certificate.getExtension(OID_EXCHANGES));
     const roles = readExtensionListValue(certificate.getExtension(OID_ROLES));
