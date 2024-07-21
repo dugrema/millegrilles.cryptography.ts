@@ -31,7 +31,7 @@ export async function signMessage(privateKey: Uint8Array, digest: string | Uint8
     return baseEncode('base64', signature);
 }
 
-export async function verifyMessageSignature(publicKey: Uint8Array, digest: string | Uint8Array, signature: string) {
+export async function verifyMessageSignature(publicKey: Uint8Array, digest: string | Uint8Array, signature: string | Uint8Array) {
     await _sodium.ready;
     const sodium = _sodium;
 
@@ -39,9 +39,41 @@ export async function verifyMessageSignature(publicKey: Uint8Array, digest: stri
         digest = Buffer.from(digest, 'hex');
     }
 
-    const signatureBytes = baseDecode(signature);
+    if(typeof(signature) === 'string') {
+        signature = baseDecode(signature);
+    }
 
-    const result = sodium.crypto_sign_verify_detached(signatureBytes, digest, publicKey);
+    const result = sodium.crypto_sign_verify_detached(signature, digest, publicKey);
     if(!result) throw new Error("Signature verification failed");
     return true;
+}
+
+export class MessageSigningKey {
+    key: Ed25519KeyPair;
+    publicKey: string;
+
+    constructor(key: Ed25519KeyPair) {
+        this.key = key;
+        this.publicKey = Buffer.from(key.public).toString('hex')
+    }
+
+    async sign(value: Uint8Array) {
+        await _sodium.ready;
+        const sodium = _sodium;
+        const signature = sodium.crypto_sign_detached(value, this.key.private);
+        return Buffer.from(signature).toString('hex');
+    }
+
+    async verify(signature: Uint8Array, value: Uint8Array): Promise<boolean> {
+        await _sodium.ready;
+        const sodium = _sodium;
+        const result = sodium.crypto_sign_verify_detached(signature, value, this.key.public);
+        if(!result) throw new Error("Signature verification failed");
+        return result
+    }
+}
+
+export async function newMessageSigningKey(privateKey: Uint8Array): Promise<MessageSigningKey> {
+    let keypair = await generateKeypairEd5519(privateKey);
+    return new MessageSigningKey(keypair)
 }
