@@ -1,6 +1,6 @@
 import * as x509 from "@peculiar/x509";
 import { Crypto } from "@peculiar/webcrypto";
-import { verifyCertificate } from "../lib/certificates"
+import { verifyCertificatePem, wrapperFromPems } from "../lib/certificates"
 
 // Wire crytpo to work on node as in the browser
 const crypto = new Crypto();
@@ -47,6 +47,56 @@ MJyb/Ppa2C6PraSVPgJGWKl+/5S5tBr58KFNg+0H94CH4d1VCPwI
 -----END CERTIFICATE-----`
 
 test('cert-validate 1', async () => {
-    const result = await verifyCertificate(CERTIFICATE_1, MILLEGRILLE_CERT)
+    const result = await verifyCertificatePem(CERTIFICATE_1, MILLEGRILLE_CERT)
     expect(result).toBe(true)
+});
+
+test('cert-wrapper 1', async () => {
+    const certificateWrapper = wrapperFromPems(CERTIFICATE_1)
+    expect(certificateWrapper).toBeDefined()
+});
+
+test('cert-wrapper-publicKey', async () => {
+    const certificateWrapper = wrapperFromPems(CERTIFICATE_1)
+    const publicKey = certificateWrapper.getPublicKey()
+    expect(publicKey).toStrictEqual('9cedf45aa5d0269de906a8cb5a692661668eed866de3b89714f61c04aa9c04')
+});
+
+test('cert-wrapper-verify-date', async () => {
+    const ca = wrapperFromPems([MILLEGRILLE_CERT])
+    const certificateWrapper = wrapperFromPems(CERTIFICATE_1, ca.certificate)
+    const result = await certificateWrapper.verify(null, new Date('2024-07-20'))
+    expect(result).toBe(true)
+});
+
+test('cert-wrapper-verify-caincluded', async () => {
+    const ca = wrapperFromPems([MILLEGRILLE_CERT])
+    const certificateWrapper = wrapperFromPems(CERTIFICATE_1, ca.certificate)
+    const result = await certificateWrapper.verify(null, false)
+    expect(result).toBe(true)
+});
+
+test('cert-wrapper-verify-caprovided', async () => {
+    const ca = wrapperFromPems([MILLEGRILLE_CERT])
+    const certificateWrapper = wrapperFromPems(CERTIFICATE_1)
+    const result = await certificateWrapper.verify(ca.certificate, false)
+    expect(result).toBe(true)
+});
+
+test('cert-wrapper-verify-noca', async () => {
+    expect.assertions(1)
+    try {
+        const certificateWrapper = wrapperFromPems(CERTIFICATE_1)
+        await certificateWrapper.verify(null, false)
+    } catch(err) {
+        expect(err).toBeDefined()
+    }
+});
+
+test('cert-wrapper-extensions', async () => {
+    const certificateWrapper = wrapperFromPems(CERTIFICATE_1)
+    certificateWrapper.populateExtensions()
+    expect(certificateWrapper.extensions.exchanges).toStrictEqual(['4.secure', '3.protege', '2.prive', '1.public'])
+    expect(certificateWrapper.extensions.roles).toStrictEqual(['core'])
+    expect(certificateWrapper.extensions.domains).toStrictEqual(['CoreBackup', 'CoreCatalogues', 'CoreMaitreDesComptes', 'CorePki', 'CoreTopologie'])
 });
