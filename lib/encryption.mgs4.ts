@@ -23,7 +23,7 @@ class Mgs4Cipher {
     state: _sodium.StateAddress;
     header: Uint8Array;
     hasher: IHasher;
-    buffer: ArrayBuffer | null;
+    excessBuffer: Uint8Array | null;
     digest?: Uint8Array;
 
     constructor(key: Uint8Array, state: _sodium.StateAddress, header: Uint8Array, hasher: IHasher) {
@@ -43,16 +43,17 @@ class Mgs4Cipher {
 
         // Concatenate excess buffer with new chunk
         let bufferInputs = [];
-        if(this.buffer) bufferInputs.push(this.buffer);
+        if(this.excessBuffer) bufferInputs.push(this.excessBuffer);
         bufferInputs.push(chunk);
         let filledBuffer = Buffer.concat(bufferInputs);
         
         // Encrypt while there is enough data to fill blocks.
         let position = 0;
         while(filledBuffer.length >= MGS4_ENCRYPT_BLOCK_SIZE + position) {
-            let currentSlice = filledBuffer.buffer.slice(position, position+MGS4_ENCRYPT_BLOCK_SIZE);
+            let currentSlice = filledBuffer.subarray(position, position+MGS4_ENCRYPT_BLOCK_SIZE)
+            
             let encryptedChunk = sodium.crypto_secretstream_xchacha20poly1305_push(
-                this.state, new Uint8Array(currentSlice), null, 
+                this.state, currentSlice, null, 
                 _sodium.crypto_secretstream_xchacha20poly1305_TAG_MESSAGE);
 
             encryptedOutputs.push(encryptedChunk);
@@ -65,16 +66,16 @@ class Mgs4Cipher {
 
         // Save excess data
         if(position > 0) {
-            this.buffer = filledBuffer.buffer.slice(position);
+            this.excessBuffer = filledBuffer.subarray(position);
         } else {
-            this.buffer = filledBuffer;
+            this.excessBuffer = filledBuffer;
         }
 
         // Convert outputs to Uint8Array if applicable.
         if(encryptedOutputs.length === 1) return encryptedOutputs[0];
         else if(encryptedOutputs.length > 0) {
             let buffer = Buffer.concat(encryptedOutputs);
-            return new Uint8Array(buffer);
+            return buffer.subarray(0)
         }
         else {
             // Chunk too small to produce output.
@@ -87,7 +88,7 @@ class Mgs4Cipher {
         const sodium = _sodium;
 
         let finalBuffer = null;
-        if(this.buffer) finalBuffer = new Uint8Array(this.buffer);
+        if(this.excessBuffer) finalBuffer = this.excessBuffer;
         let encryptedOutput = sodium.crypto_secretstream_xchacha20poly1305_push(
             this.state, finalBuffer, null, 
             _sodium.crypto_secretstream_xchacha20poly1305_TAG_FINAL);
@@ -118,7 +119,7 @@ class Mgs4Decipher {
     state: _sodium.StateAddress;
     header: Uint8Array;
     hasher: IHasher;
-    buffer: ArrayBuffer | null;
+    excessBuffer: Uint8Array | null;
 
     constructor(key: Uint8Array, state: _sodium.StateAddress, header: Uint8Array) {
         this.key = key;
@@ -136,16 +137,16 @@ class Mgs4Decipher {
 
         // Concatenate excess buffer with new chunk
         let bufferInputs = [];
-        if(this.buffer) bufferInputs.push(Buffer.from(this.buffer));
+        if(this.excessBuffer) bufferInputs.push(this.excessBuffer);
         bufferInputs.push(chunk);
         let filledBuffer = Buffer.concat(bufferInputs);
         
         // Encrypt while there is enough data to fill blocks.
         let position = 0;
         while(filledBuffer.length >= MGS4_DECRYPT_BLOCK_SIZE + position) {
-            let currentSlice = filledBuffer.buffer.slice(position, position+MGS4_DECRYPT_BLOCK_SIZE);
+            let currentSlice = filledBuffer.subarray(position, position+MGS4_DECRYPT_BLOCK_SIZE);
             let {message: decryptedChunk, tag} = sodium.crypto_secretstream_xchacha20poly1305_pull(
-                this.state, new Uint8Array(currentSlice), null);
+                this.state, currentSlice, null);
 
             encryptedOutputs.push(decryptedChunk);
     
@@ -161,9 +162,9 @@ class Mgs4Decipher {
 
         // Save excess data
         if(position > 0) {
-            this.buffer = filledBuffer.buffer.slice(position);
+            this.excessBuffer = filledBuffer.subarray(position);
         } else {
-            this.buffer = filledBuffer;
+            this.excessBuffer = filledBuffer;
         }
 
         // Convert outputs to Uint8Array if applicable.
@@ -182,9 +183,9 @@ class Mgs4Decipher {
         await _sodium.ready;
         const sodium = _sodium;
 
-        if(this.buffer == null) return
+        if(this.excessBuffer == null) return
 
-        let finalBuffer = new Uint8Array(this.buffer);
+        let finalBuffer = new Uint8Array(this.excessBuffer);
         let {message: decryptedChunk, tag} = sodium.crypto_secretstream_xchacha20poly1305_pull(
             this.state, finalBuffer, null);
         
