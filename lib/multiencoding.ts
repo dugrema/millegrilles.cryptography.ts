@@ -17,6 +17,10 @@ export function hashEncode(encoding: multibase.BaseName, hashName: multihash.Has
     return baseEncode(encoding, encoded)
 }
 
+export function getMultihashBytes(hashName: multihash.HashName, digest: Uint8Array) {
+    return multihash.encode(digest, hashName)
+}
+
 /**
  * Wrapper for multibase encoding with the supported encodings.
  * @param encoding Name of the multibase encoding.

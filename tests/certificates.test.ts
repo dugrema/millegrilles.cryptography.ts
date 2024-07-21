@@ -1,6 +1,6 @@
 import * as x509 from "@peculiar/x509";
 import { Crypto } from "@peculiar/webcrypto";
-import { verifyCertificatePem, wrapperFromPems } from "../lib/certificates"
+import { verifyCertificatePem, wrapperFromPems, getIdmg } from "../lib/certificates"
 
 // Wire crytpo to work on node as in the browser
 const crypto = new Crypto();
@@ -100,3 +100,14 @@ test('cert-wrapper-extensions', async () => {
     expect(certificateWrapper.extensions.roles).toStrictEqual(['core'])
     expect(certificateWrapper.extensions.domains).toStrictEqual(['CoreBackup', 'CoreCatalogues', 'CoreMaitreDesComptes', 'CorePki', 'CoreTopologie'])
 });
+
+test('cert-wrapper-verify-commonName', async () => {
+    let certificateWrapper = wrapperFromPems(CERTIFICATE_1)
+    let commonName = certificateWrapper.getCommonName()
+    expect(commonName).toBe('a0bb5dbb-72fb-413f-97ff-798d2aef0d50')
+});
+
+test('cert-getIdmg', async () => {
+    let idmg = await getIdmg(MILLEGRILLE_CERT)
+    expect(idmg).toStrictEqual('zeYncRqEqZ6eTEmUZ8whJFuHG796eSvCTWE4M432izXrp22bAtwGm7Jf')
+})

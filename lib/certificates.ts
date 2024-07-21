@@ -1,4 +1,6 @@
 import { BasicConstraintsExtension, X509Certificate, Extension } from "@peculiar/x509";
+import { baseEncode, getMultihashBytes } from './multiencoding'
+import { digest } from "./digest";
 
 // Custom x509v3 OID extensions for MilleGrille certificates
 const OID_EXCHANGES = "1.2.3.4.0";
@@ -105,6 +107,11 @@ export class CertificateWrapper {
         // Return in hex format
         return Buffer.from(publicKeySlice).toString('hex');
     }
+
+    getCommonName(): string {
+        let subject = this.certificate.subjectName;
+        return subject.getField('CN').pop()
+    }
 };
 
 function extractMillegrillesExtensions(certificate: X509Certificate): MilleGrillesCertificateExtensions {
@@ -136,4 +143,41 @@ function readExtensionValue(extension: Extension) {
 export function wrapperFromPems(pems: string[], ca?: X509Certificate): CertificateWrapper {
     let chain = pems.map(item=>new X509Certificate(item));
     return new CertificateWrapper(chain, ca)
+}
+
+/**
+ * Generate a MilleGrilles identifier (IDMG).
+ * @param ca CA certificate for the MilleGrille.
+ * @returns The IDMG for this certificate.
+ */
+export async function getIdmg(ca: X509Certificate | string) {
+    if(typeof(ca) === 'string') {
+        ca = new X509Certificate(ca);
+    }
+
+    // Get the public key digest using blake2s-256
+    const certDigest = await digest(new Uint8Array(ca.rawData), {encoding: 'bytes', digestName: 'blake2s-256'});
+    if(!ArrayBuffer.isView(certDigest)) throw new Error("wrong encoding");
+    
+    // Encode with multihash
+    let certMhDigest = getMultihashBytes('blake2s-256', new Uint8Array(certDigest))
+
+    // Prepare expiration date to fit in 32 bytes
+    const expirationDateBuffer = _idmgExpirationTo32Uint(ca.notAfter)
+
+    let outputBuffer = new Uint8Array(41);
+    outputBuffer.set([0x2], 0);     // Version 2
+    outputBuffer.set(expirationDateBuffer, 1)  // 4 bytes for the expiration date
+    outputBuffer.set(certMhDigest, 5); // Multihash of the public key
+
+    return baseEncode('base58btc', outputBuffer)
+}
+
+function _idmgExpirationTo32Uint(notAfter: Date): Uint8Array {
+    const dateExpEpoch_1000 = Math.ceil(notAfter.getTime() / 1000000);
+    const bufferExpiration = new ArrayBuffer(4)
+    const view32Uint = new Uint32Array(bufferExpiration)
+    view32Uint[0] = dateExpEpoch_1000
+  
+    return new Uint8Array(bufferExpiration);
 }
