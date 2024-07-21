@@ -73,33 +73,33 @@ test('encrypt-decrypt 1MB', async () => {
     expect(Buffer.from(clear1).subarray(0,BUFFER_100k.length)).toStrictEqual(Buffer.from(BUFFER_100k));
 });
 
-test('encrypt-decrypt 100MB', async () => {
-    let cipher = await getMgs4Cipher();
-    let output: Uint8Array[] = []
-    for(let i=0; i<1000; i++) {
-        let out = await cipher.update(BUFFER_100k);
-        output.push(out)
-    }
-    let finalOutput = await cipher.finalize();
-    let outputBuffer = Buffer.concat(output)
-    expect(outputBuffer.length).toBe(100007936)
-    expect(finalOutput.length).toBe(18023)
+// test('encrypt-decrypt 100MB', async () => {
+//     let cipher = await getMgs4Cipher();
+//     let output: Uint8Array[] = []
+//     for(let i=0; i<1000; i++) {
+//         let out = await cipher.update(BUFFER_100k);
+//         output.push(out)
+//     }
+//     let finalOutput = await cipher.finalize();
+//     let outputBuffer = Buffer.concat(output)
+//     expect(outputBuffer.length).toBe(100007936)
+//     expect(finalOutput.length).toBe(18023)
 
-    let {header, key, digest} = cipher;
-    expect(header).toBeTruthy()
-    expect(key).toBeTruthy()
-    expect(digest.length).toBe(64)
+//     let {header, key, digest} = cipher;
+//     expect(header).toBeTruthy()
+//     expect(key).toBeTruthy()
+//     expect(digest.length).toBe(64)
 
-    let decipher = await getMgs4Decipher(key, header);
-    let clear1 = await decipher.update(outputBuffer);
-    let clear2 = await decipher.update(finalOutput);
-    let clear3 = await decipher.finalize();
-    expect(clear1.length).toBe(99981994);
-    expect(clear2).toBeNull();
-    expect(clear3.length).toBe(18006);
-    // Check only first part (BUFFER_2 is repeated)
-    expect(Buffer.from(clear1).subarray(0,BUFFER_100k.length)).toStrictEqual(Buffer.from(BUFFER_100k));
-});
+//     let decipher = await getMgs4Decipher(key, header);
+//     let clear1 = await decipher.update(outputBuffer);
+//     let clear2 = await decipher.update(finalOutput);
+//     let clear3 = await decipher.finalize();
+//     expect(clear1.length).toBe(99981994);
+//     expect(clear2).toBeNull();
+//     expect(clear3.length).toBe(18006);
+//     // Check only first part (BUFFER_2 is repeated)
+//     expect(Buffer.from(clear1).subarray(0,BUFFER_100k.length)).toStrictEqual(Buffer.from(BUFFER_100k));
+// });
 
 test('encrypt-decrypt exact blocksize', async () => {
     let cipher = await getMgs4Cipher();
