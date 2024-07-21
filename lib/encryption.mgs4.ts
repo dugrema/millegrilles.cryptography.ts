@@ -49,8 +49,8 @@ class Mgs4Cipher {
         
         // Encrypt while there is enough data to fill blocks.
         let position = 0;
-        while(filledBuffer.length > MGS4_ENCRYPT_BLOCK_SIZE + position) {
-            let currentSlice = filledBuffer.buffer.slice(position, MGS4_ENCRYPT_BLOCK_SIZE);
+        while(filledBuffer.length >= MGS4_ENCRYPT_BLOCK_SIZE + position) {
+            let currentSlice = filledBuffer.buffer.slice(position, position+MGS4_ENCRYPT_BLOCK_SIZE);
             let encryptedChunk = sodium.crypto_secretstream_xchacha20poly1305_push(
                 this.state, new Uint8Array(currentSlice), null, 
                 _sodium.crypto_secretstream_xchacha20poly1305_TAG_MESSAGE);
@@ -136,14 +136,14 @@ class Mgs4Decipher {
 
         // Concatenate excess buffer with new chunk
         let bufferInputs = [];
-        if(this.buffer) bufferInputs.push(this.buffer);
+        if(this.buffer) bufferInputs.push(Buffer.from(this.buffer));
         bufferInputs.push(chunk);
         let filledBuffer = Buffer.concat(bufferInputs);
         
         // Encrypt while there is enough data to fill blocks.
         let position = 0;
-        while(filledBuffer.length > MGS4_DECRYPT_BLOCK_SIZE + position) {
-            let currentSlice = filledBuffer.buffer.slice(position, MGS4_DECRYPT_BLOCK_SIZE);
+        while(filledBuffer.length >= MGS4_DECRYPT_BLOCK_SIZE + position) {
+            let currentSlice = filledBuffer.buffer.slice(position, position+MGS4_DECRYPT_BLOCK_SIZE);
             let {message: decryptedChunk, tag} = sodium.crypto_secretstream_xchacha20poly1305_pull(
                 this.state, new Uint8Array(currentSlice), null);
 
@@ -156,7 +156,7 @@ class Mgs4Decipher {
                 throw new Error("MGS4 Decryption error, out of sync");
             }
 
-            position += MGS4_ENCRYPT_BLOCK_SIZE;
+            position += MGS4_DECRYPT_BLOCK_SIZE;
         }
 
         // Save excess data
@@ -192,7 +192,7 @@ class Mgs4Decipher {
             throw new Error("MGS4 Decryption error, out of sync");
         }
         
-        // Extract authentication tag from last 16 bytes
-        return decryptedChunk
+        if(decryptedChunk.length === 0) return null;
+        return decryptedChunk;
     }    
 }
