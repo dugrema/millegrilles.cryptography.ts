@@ -2,9 +2,9 @@ import stringify from 'json-stable-stringify'
 import { digest } from './digest';
 import { MessageSigningKey, verifyMessageSignature } from './ed25519';
 import { CertificateWrapper } from './certificates';
-import { getMgs4CipherWithSecret } from './encryption.mgs4';
-import { secretFromEd25519, secretFromEd25519PrivateX25519Peer } from './x25519';
-import { encodeBase64Nopad } from './multiencoding';
+import { getMgs4CipherWithSecret, getMgs4Decipher } from './encryption.mgs4';
+import { decryptEd25519, encryptEd25519, secretFromEd25519 } from './x25519';
+import { decodeBase64Nopad, encodeBase64Nopad } from './multiencoding';
 import { DomainSignature } from './keymaster';
 
 export enum MessageKind {
@@ -78,7 +78,9 @@ export class MilleGrillesMessage {
         if(!decryptionKey) throw new Error("The message is encrypted. The decryption key must be provided.");
         if(!this.dechiffrage) throw new Error("The message is encrypted but is missing the decryption information.");
 
-        return await decryptMessageContent(decryptionKey, this.kind, this.dechiffrage, this.contenu);
+        let decryptedContent = await decryptMessageContent(decryptionKey, this.kind, this.dechiffrage, this.contenu);
+
+        return JSON.parse(decryptedContent);
     }
 };
 
@@ -213,8 +215,8 @@ export async function createEncryptedResponse(
     for(let encryptionKey of encryptionKeys) {
         let publicKey = encryptionKey.getPublicKey();
         let publicKeyBytes = Buffer.from(publicKey, 'hex');
-        let encryptedSecret = await secretFromEd25519PrivateX25519Peer(secret.secret, publicKeyBytes);
-        cles[publicKey] = encodeBase64Nopad(encryptedSecret);
+        let encryptedSecret = await encryptEd25519(secret.secret, publicKeyBytes);
+        cles[publicKey] = encryptedSecret;
     }
 
     // Populate decryption information
@@ -241,6 +243,24 @@ export async function createEncryptedCommand(
 
 async function decryptMessageContent(
     decryptionKey: MessageSigningKey, kind: MessageKind, decryption: MessageDecryption, content: string
-): Promise<Object> {
-    throw new Error('todo')
+): Promise<string> {
+    let pubId = decryptionKey.publicKey;
+    let encryptedKey = decryption.cles[pubId];
+    if(!encryptedKey) throw new Error("No matching key found to decrypt message");
+    let headerBytes = decodeBase64Nopad(decryption.nonce);
+
+    let privateKey = decryptionKey.key.private.slice(0, 32);  // The key has the private + public components.
+
+    // Get the secret key
+    let secretKey = await decryptEd25519(encryptedKey, privateKey);
+
+    let decipher = await getMgs4Decipher(secretKey, headerBytes);
+    let contentBytes = decodeBase64Nopad(content);
+    let outputBuffers = [];
+    outputBuffers.push(await decipher.update(contentBytes));
+    outputBuffers.push(await decipher.finalize());
+    outputBuffers = outputBuffers.filter(item=>item);  // Remove null buffers
+    let output = Buffer.concat(outputBuffers);
+
+    return new TextDecoder().decode(output);
 }

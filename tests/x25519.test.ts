@@ -1,5 +1,5 @@
 import { secretFromEd25519, secretFromEd25519PrivateX25519Peer, encryptEd25519, decryptEd25519 } from '../lib/x25519';
-import {baseDecode} from '../lib/multiencoding'
+import { decodeBase64Nopad } from '../lib/multiencoding'
 import _sodium from 'libsodium-wrappers';
 
 const CA_PRIVATE_KEY = new Uint8Array(Buffer.from('01234567890123456789012345678901234567890123456789012345678901234', 'hex'));
@@ -26,7 +26,7 @@ test('encrypt-decrypt Key', async () => {
     const publicKey = caKey.publicKey;
 
     const val = await encryptEd25519(SECRET_KEY, publicKey);
-    const decodedValue = baseDecode(val);
+    const decodedValue = decodeBase64Nopad(val);
     expect(decodedValue.length).toBe(80);
 
     const cleartext = await decryptEd25519(val, CA_PRIVATE_KEY);

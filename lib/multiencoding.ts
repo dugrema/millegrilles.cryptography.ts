@@ -60,6 +60,10 @@ export function encodeBase64Nopad(value: Uint8Array): string {
     return String.fromCharCode.apply(null, multibase.encode('base64', value).slice(1))
 }
 
+export function decodeBase64Nopad(value: string): Uint8Array {
+    return multibase.decode('m'+value)
+}
+
 type MultihashDecodeResult = {
     name: multihash.HashName,
     digest: Uint8Array,

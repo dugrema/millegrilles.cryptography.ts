@@ -1,4 +1,4 @@
-import { wrapperFromPems } from '../lib/certificates';
+import { loadPrivateKeyEd25519, wrapperFromPems } from '../lib/certificates';
 import { newMessageSigningKey } from '../lib/ed25519';
 import { MessageKind, createRoutedMessage, MilleGrillesMessage, Routage, createResponse, createEncryptedResponse } from '../lib/messageStruct'
 
@@ -126,4 +126,12 @@ test('create encrypted response', async () => {
     expect(message.signature).toBeTruthy();
     expect(message.contenu).toBeTruthy();
     expect(message.certificate).toStrictEqual(CERTIFICATE_1);
+
+    // Decrypt the message
+    let privateKey = loadPrivateKeyEd25519(PRIVATE_KEY_1);
+    let decryptionKey = await newMessageSigningKey(privateKey, certificateWrapper);
+    let cleartextContent = await message.getContent(decryptionKey);
+    
+    // Compare content to confirm round-trip
+    expect(cleartextContent).toStrictEqual(content);
 });

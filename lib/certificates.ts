@@ -222,14 +222,14 @@ export function splitCertificatePems(pems: string) {
 const KEY_BEGIN = '-----BEGIN PRIVATE KEY-----';
 const KEY_END = '-----END PRIVATE KEY-----';
 
-export function loadPrivateKeyEd25519(pem: string, password?: string) {
+export function loadPrivateKeyEd25519(pem: string, password?: string): Uint8Array {
     if(password) throw new Error('not implemented');
 
     let keyString = pem.replace(KEY_BEGIN, '').replace(KEY_END, '').replace(/\\r\\n/g, '');
     let keyBytes = Buffer.from(keyString, 'base64');
     let ecParams = AsnConvert.parse(keyBytes, PrivateKeyInfo);
     let privateKey = ecParams.privateKey.slice(ecParams.privateKey.byteLength-32);
-    return privateKey
+    return new Uint8Array(privateKey)
 }
 
 export function savePrivateKeyEd25519(key: Uint8Array, password?: string): string {

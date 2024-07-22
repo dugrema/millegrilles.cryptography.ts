@@ -1,9 +1,8 @@
 import { digest } from './digest';
-import { baseEncode, baseDecode, encodeBase64Nopad } from './multiencoding';
+import { encodeBase64Nopad, decodeBase64Nopad } from './multiencoding';
 import { encryptChacha20Poly1305, decryptChacha20Poly1305 } from './encryption'
 import { generateKeypairEd5519 } from './ed25519';
 import _sodium from 'libsodium-wrappers';
-import { encodeBase64 } from 'hash-wasm/dist/lib/util';
 
 type SecretFromEd25519Result = {
     secret: Uint8Array,     // Secret value to use
@@ -107,13 +106,13 @@ export async function encryptEd25519(secretKey: Uint8Array, publicKey: Uint8Arra
     const encryptedKeyBuffer = new Uint8Array(80);
     encryptedKeyBuffer.set(newKey.peerBytes, 0); // 32 bytes x25519 public peer
     encryptedKeyBuffer.set(ciphertext, 32);      // 32 bytes encrypted secret key (chacha20-poly1305) + 16 bytes authentication tag
-    const encryptedKey = baseEncode('base64', encryptedKeyBuffer);
+    const encryptedKey = encodeBase64Nopad(encryptedKeyBuffer);
 
     return encryptedKey;
 }
 
 export async function decryptEd25519(key: string, privateKey: Uint8Array): Promise<Uint8Array> {
-    const keyBytes = baseDecode(key);
+    const keyBytes = decodeBase64Nopad(key);
 
     // Get shared secret to decrypt key
     const publicPeer = keyBytes.slice(0, 32);
