@@ -352,7 +352,7 @@ export class CertificateStore {
         let chain: X509Certificate[];
         if(certificateWrapper) {
             // We got a cache hit. Recover the chain.
-            console.debug("Cache HIT");
+            //console.debug("Cache HIT");
             chain = certificateWrapper.chain;
             // No need to check the pubkey.
             // We got a match from the cache so we know the certificate matches this message (or the 
