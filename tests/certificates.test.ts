@@ -159,12 +159,12 @@ test('test store message', async ()=>{
     let store = new CertificateStore(MILLEGRILLE_CERT);
     store.cache = new CertificateCache();
     let message = parseMessage(JSON.stringify(MESSAGE_1));
-    let result = await store.verifyMessage(message);
-    expect(result).toBe(true);
-    let wrapper = await store.cache.getCertificate('aff9cc396160b720479bd910187629388c14aa22af0f084f9a6f688bcb17cd4a');
-    expect(wrapper).toBeDefined();
+    let wrapperVerify1 = await store.verifyMessage(message);
+    expect(wrapperVerify1).toBeTruthy();
+    let cachedWrapper = await store.cache.getCertificate('aff9cc396160b720479bd910187629388c14aa22af0f084f9a6f688bcb17cd4a');
+    expect(cachedWrapper).toBe(wrapperVerify1);
 
-    // No real way to check for a cache hit...
-    let result2 = await store.verifyMessage(message);
-    expect(result2).toBe(true);
+    // Test cache HIT
+    let wrapperVerify2 = await store.verifyMessage(message);
+    expect(wrapperVerify2).toBe(wrapperVerify1);  // Checks that we got the same object back with toBe.
 })

@@ -289,7 +289,7 @@ export class CertificateCache {
      * @param chain X509Certificate chain
      * @returns True if saved, false if the cache is full.
      */
-    async saveCertificate(chain: string[]): Promise<boolean> {
+    async saveCertificate(chain: string[]): Promise<CertificateWrapper | boolean> {
         if(Object.keys(this.cacheContent).length >= this.maxSize) {
             return false;  // Full
         }
@@ -298,7 +298,7 @@ export class CertificateCache {
         let wrapper = new CertificateWrapper(chain)
         this.cacheContent[wrapper.getPublicKey()] = {wrapper, date: new Date()};
 
-        return true;
+        return wrapper;
     }
 
     async touch(pubkey: string) {
@@ -341,7 +341,7 @@ export class CertificateStore {
         return result
     }
 
-    async verifyMessage(message: MilleGrillesMessage): Promise<boolean> {
+    async verifyMessage(message: MilleGrillesMessage): Promise<CertificateWrapper> {
         let timestamp = message.estampille;
         let messageDate = new Date(timestamp * 1000);
 
@@ -367,11 +367,18 @@ export class CertificateStore {
             if(publicKey !== publicKeyCert) throw new Error('Mismatch between pubkey and attached certificate');
         }
 
-        let result = await verifyCertificate(chain, this.ca, messageDate)
-        if(result && this.cache) {
-            await this.cache.saveCertificate(message.certificate);
+        let verifyResult = await verifyCertificate(chain, this.ca, messageDate)
+        if(verifyResult && this.cache && !certificateWrapper) {
+            // Save to cache - reuse wrapper if possible.
+            let saveResult = await this.cache.saveCertificate(message.certificate);
+            if(typeof(saveResult) !== 'boolean') certificateWrapper = saveResult;
         }
-        return result
+
+        if(!certificateWrapper) {
+            // Generate new wrapper for this certificate.
+            certificateWrapper = new CertificateWrapper(message.certificate)
+        }
+
+        return certificateWrapper
     }
 }
-
