@@ -1,8 +1,19 @@
 import stringify from 'json-stable-stringify'
 import { digest } from './digest';
 import { MessageSigningKey, verifyMessageSignature } from './ed25519';
+import { CertificateWrapper } from './certificates';
 
-export type MessageKind = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8;
+export enum MessageKind {
+    Document = 0,
+    Request = 1,
+    Command = 2,
+    Transaction = 3,
+    Response = 4,
+    Event = 5,
+    EncryptedResponse = 6,
+    MigratedTransaction = 7,
+    EncryptedCommand = 8,
+}
 
 export type Routage = {};
 
@@ -21,7 +32,7 @@ export class MilleGrillesMessage {
     origine?: string;  // System of origin (IDMG)
     dechiffrage?: MessageDecryption;  // Decryption information.
     signature: string;  // Message signature
-    certificate?: [string];  // PEM certificat chain (excluding the CA/root)
+    certificate?: string[];  // PEM certificat chain (excluding the CA/root)
     millegrille?: string;  // PEM certificate of the system (CA/root)
     attachements?: {}  // Attachments to this message
 
@@ -101,6 +112,7 @@ async function signMessage(message: MilleGrillesMessage, key: MessageSigningKey)
     if(!message.id) throw new Error("Message id is missing");
     let messageId = Buffer.from(message.id, 'hex');
     let signature = await key.sign(messageId);
+    message.certificate = key.certificate.pemChain;
     return signature
 }
 
@@ -110,4 +122,55 @@ async function verifyMessage(message: MilleGrillesMessage): Promise<boolean> {
     let signatureBytes = Buffer.from(message.signature, 'hex');
     let pubkey = Buffer.from(message.pubkey, 'hex');
     return await verifyMessageSignature(pubkey, messageId, signatureBytes);
+}
+
+export async function createRoutedMessage(
+    signingKey: MessageSigningKey, kind: MessageKind, content: Object, routing: Routage, timestamp?: Date
+): Promise<MilleGrillesMessage> {
+    if(![1,2,3,5].includes(kind)) throw new Error("createStandardMessage Only supports kinds 1, 2, 3 and 5");
+    
+    if(!timestamp) timestamp = new Date();
+    let timestampEpoch: number = Math.floor(timestamp.getTime() / 1000);
+    let contentString = stringify(content);
+    let message = new MilleGrillesMessage(timestampEpoch, kind, contentString);
+    message.routage = routing;
+    await message.sign(signingKey);
+
+    return message
+}
+
+export async function createDocument(
+    signingKey: MessageSigningKey, content: Object, timestamp?: Date
+): Promise<MilleGrillesMessage> {
+    return await createSimpleMessage(signingKey, MessageKind.Document, content, timestamp);
+}
+
+export async function createResponse(
+    signingKey: MessageSigningKey, content: Object, timestamp?: Date
+): Promise<MilleGrillesMessage> {
+    return await createSimpleMessage(signingKey, MessageKind.Response, content, timestamp);
+}
+
+async function createSimpleMessage(
+    signingKey: MessageSigningKey, kind: MessageKind, content: Object, timestamp?: Date
+): Promise<MilleGrillesMessage> {
+    if(!timestamp) timestamp = new Date();
+    let timestampEpoch: number = Math.floor(timestamp.getTime() / 1000);
+    let contentString = stringify(content);
+    let message = new MilleGrillesMessage(timestampEpoch, MessageKind.Document, contentString);
+    await message.sign(signingKey);
+
+    return message
+}
+
+export async function createEncryptedResponse(
+    signingKey: MessageSigningKey, encryptionKeys: CertificateWrapper[], content: Object, timestamp?: Date
+): Promise<MilleGrillesMessage> {
+    throw new Error('not implemented')
+}
+
+export async function createEncryptedCommand(
+    signingKey: MessageSigningKey, encryptionKeys: CertificateWrapper[], content: Object, routing: Routage, timestamp?: Date
+): Promise<MilleGrillesMessage> {
+    throw new Error('not implemented')
 }

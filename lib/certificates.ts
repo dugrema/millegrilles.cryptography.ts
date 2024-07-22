@@ -82,12 +82,23 @@ export class CertificateWrapper {
     readonly certificate: X509Certificate;
     readonly chain: X509Certificate[];
     readonly millegrille?: X509Certificate;
+    readonly pemChain: string[];
+    readonly pemMillegrille?: string;
     extensions?: MilleGrillesCertificateExtensions;
 
-    constructor(chain: X509Certificate[], millegrille?: X509Certificate) {
-        this.certificate = chain[0];
-        this.chain = chain;
-        this.millegrille = millegrille;
+    constructor(pemChain: string[], pemMillegrille?: string) {
+        // Save PEMs for future reference (e.g. when signing)
+        this.pemChain = pemChain;
+        this.pemMillegrille = pemMillegrille;
+
+        // Map the PEMs to certificate objects
+        this.chain = pemChain.map(item=>new X509Certificate(item));
+        if(pemMillegrille) {
+            this.millegrille = new X509Certificate(pemMillegrille);
+        }
+
+        // Point to main certificate for easier reference
+        this.certificate = this.chain[0];
     }
 
     populateExtensions() {
@@ -145,9 +156,8 @@ function readExtensionValue(extension: Extension) {
     return new TextDecoder().decode(extension.value);
 }
 
-export function wrapperFromPems(pems: string[], ca?: X509Certificate): CertificateWrapper {
-    let chain = pems.map(item=>new X509Certificate(item));
-    return new CertificateWrapper(chain, ca)
+export function wrapperFromPems(pems: string[], ca?: string): CertificateWrapper {
+    return new CertificateWrapper(pems, ca)
 }
 
 /**

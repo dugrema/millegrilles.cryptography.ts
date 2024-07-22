@@ -63,15 +63,13 @@ test('cert-wrapper-publicKey', async () => {
 });
 
 test('cert-wrapper-verify-date', async () => {
-    const ca = wrapperFromPems([MILLEGRILLE_CERT])
-    const certificateWrapper = wrapperFromPems(CERTIFICATE_1, ca.certificate)
+    const certificateWrapper = wrapperFromPems(CERTIFICATE_1, MILLEGRILLE_CERT)
     const result = await certificateWrapper.verify(null, new Date('2024-07-20'))
     expect(result).toBe(true)
 });
 
 test('cert-wrapper-verify-caincluded', async () => {
-    const ca = wrapperFromPems([MILLEGRILLE_CERT])
-    const certificateWrapper = wrapperFromPems(CERTIFICATE_1, ca.certificate)
+    const certificateWrapper = wrapperFromPems(CERTIFICATE_1, MILLEGRILLE_CERT)
     const result = await certificateWrapper.verify(null, false)
     expect(result).toBe(true)
 });

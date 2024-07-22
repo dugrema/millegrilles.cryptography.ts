@@ -1,6 +1,7 @@
 import _sodium from 'libsodium-wrappers';
 import { getRandom } from './random';
 import { baseEncode, baseDecode } from './multiencoding';
+import { CertificateWrapper } from './certificates';
 
 type Ed25519KeyPair = {public: Uint8Array, private: Uint8Array};
 
@@ -51,10 +52,12 @@ export async function verifyMessageSignature(publicKey: Uint8Array, digest: stri
 export class MessageSigningKey {
     key: Ed25519KeyPair;
     publicKey: string;
+    certificate: CertificateWrapper;
 
-    constructor(key: Ed25519KeyPair) {
+    constructor(key: Ed25519KeyPair, certificate: CertificateWrapper) {
         this.key = key;
         this.publicKey = Buffer.from(key.public).toString('hex')
+        this.certificate = certificate;
     }
 
     async sign(value: Uint8Array) {
@@ -71,9 +74,13 @@ export class MessageSigningKey {
         if(!result) throw new Error("Signature verification failed");
         return result
     }
+
+    getChain() {
+        return this.certificate.pemChain;
+    }
 }
 
-export async function newMessageSigningKey(privateKey: Uint8Array): Promise<MessageSigningKey> {
+export async function newMessageSigningKey(privateKey: Uint8Array, certificate: CertificateWrapper): Promise<MessageSigningKey> {
     let keypair = await generateKeypairEd5519(privateKey);
-    return new MessageSigningKey(keypair)
+    return new MessageSigningKey(keypair, certificate)
 }
