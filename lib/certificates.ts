@@ -216,7 +216,9 @@ function _idmgExpirationTo32Uint(notAfter: Date): Uint8Array {
 const CERTIFICATE_END = '-----END CERTIFICATE-----';
 
 export function splitCertificatePems(pems: string) {
-    return pems.split(CERTIFICATE_END).map(item=>item+CERTIFICATE_END)
+    return pems.split(CERTIFICATE_END)
+        .filter(item=>item)  // Remove empty elements
+        .map(item=>item+CERTIFICATE_END)  // Put the END block back
 }
 
 const KEY_BEGIN = '-----BEGIN PRIVATE KEY-----';

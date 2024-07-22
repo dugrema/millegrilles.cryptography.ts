@@ -1,7 +1,7 @@
 import _sodium from 'libsodium-wrappers';
 import { getRandom } from './random';
 import { baseEncode, baseDecode } from './multiencoding';
-import { CertificateWrapper, splitCertificatePems } from './certificates';
+import { CertificateWrapper, loadPrivateKeyEd25519, splitCertificatePems, wrapperFromPems } from './certificates';
 
 type Ed25519KeyPair = {public: Uint8Array, private: Uint8Array};
 
@@ -85,7 +85,9 @@ export async function newMessageSigningKey(privateKey: Uint8Array, certificate: 
     return new MessageSigningKey(keypair, certificate)
 }
 
-export function signingKeyFromPems(privateKeyPem: string, certificatChain: string) {
-    let certificatChainList = splitCertificatePems(certificatChain);
-    //let privateKeyBytes = ;
+export async function loadSigningKeyFromPems(privateKeyPem: string, certificateChain: string, caPem: string) {
+    let certificatChainList = splitCertificatePems(certificateChain);
+    let certificateWrapper = wrapperFromPems(certificatChainList, caPem);
+    let privateKey = loadPrivateKeyEd25519(privateKeyPem);
+    return await newMessageSigningKey(privateKey, certificateWrapper);
 }
