@@ -236,13 +236,14 @@ export function loadPrivateKeyEd25519(pem: string, password?: string): Uint8Arra
 
 export function savePrivateKeyEd25519(key: Uint8Array, password?: string): string {
     if(key.length != 32) throw new Error("The private key must by 32 bytes in length");
-    const algorithm = new AlgorithmIdentifier({
-        algorithm: '1.3.101.112',
-    });
 
     if(password) throw new Error('not implemented');
 
     // From : https://github.com/PeculiarVentures/asn1-schema/issues/82
+
+    const algorithm = new AlgorithmIdentifier({
+        algorithm: '1.3.101.112',
+    });
 
     // CurvePrivateKey ::= OCTET STRING
     const curvePrivateKey = new OctetString(key.length);
@@ -254,8 +255,8 @@ export function savePrivateKeyEd25519(key: Uint8Array, password?: string): strin
         privateKeyAlgorithm: algorithm,
         privateKey: new PrivateKeyPkcs8(AsnConvert.serialize(curvePrivateKey)),
     });
-    let keyBase64 = Buffer.from(AsnConvert.serialize(pkcs8)).toString("base64")
+    let keyBase64 = Buffer.from(AsnConvert.serialize(pkcs8)).toString("base64");
     
     let pemList = [KEY_BEGIN, keyBase64, KEY_END];
-    return pemList.join('\n')
+    return pemList.join('\n');
 }
