@@ -5,6 +5,7 @@ import { AsnConvert, OctetString } from "@peculiar/asn1-schema";
 import { PrivateKeyInfo } from "@peculiar/asn1-asym-key";
 import { AlgorithmIdentifier } from '@peculiar/asn1-x509';
 import { PrivateKey as PrivateKeyPkcs8, PrivateKeyInfo as PrivateKeyInfoPkcs8 } from '@peculiar/asn1-pkcs8';
+import { MilleGrillesMessage } from "./messageStruct";
 
 // Custom x509v3 OID extensions for MilleGrille certificates
 const OID_EXCHANGES = "1.2.3.4.0";
@@ -260,3 +261,119 @@ export function savePrivateKeyEd25519(key: Uint8Array, password?: string): strin
     let pemList = [KEY_BEGIN, keyBase64, KEY_END];
     return pemList.join('\n');
 }
+
+export class CertificateCache {
+    maxSize: number;
+    cacheContent: { [pubkey: string]: { wrapper: CertificateWrapper, date: Date } };
+
+    constructor(maxSize?: number) {
+        this.maxSize = maxSize | 20;
+        this.cacheContent = {};
+    }
+
+    /**
+     * @returns Certificate if cached
+     * @param pubkey Certificate to load from the cache
+     */
+    async getCertificate(pubkey: string): Promise<CertificateWrapper> | null {
+        let cacheValue = this.cacheContent[pubkey];
+        if(cacheValue) {
+            cacheValue.date = new Date();  // Touch
+            return cacheValue.wrapper;
+        }
+    }
+
+    /**
+     * Saves a certificate in the cache.
+     * @param pubkey Public key in hex of this certificate
+     * @param chain X509Certificate chain
+     * @returns True if saved, false if the cache is full.
+     */
+    async saveCertificate(chain: string[]): Promise<boolean> {
+        if(Object.keys(this.cacheContent).length >= this.maxSize) {
+            return false;  // Full
+        }
+
+        // Save the wrapper with the public key as identifier.
+        let wrapper = new CertificateWrapper(chain)
+        this.cacheContent[wrapper.getPublicKey()] = {wrapper, date: new Date()};
+
+        return true;
+    }
+
+    async touch(pubkey: string) {
+        let cacheValue = this.cacheContent[pubkey];
+        if(cacheValue) cacheValue['date'] = new Date();
+    }
+
+    /**
+     * Run regularly to expire the cache entries.
+     * @param expiration Expiration of a cache entry after its last access.
+     */
+    async maintain(expiration?: number) {
+        expiration = expiration || 300_000;  // Default is 5 minutes.
+        let keys = Object.keys(this.cacheContent);
+        let expirationDate = new Date().getTime() - expiration;
+        for(let key of keys) {
+            let value = this.cacheContent[key];
+            console.debug("Expiration date : %O, entry date : %O", expirationDate, value.date.getTime())
+            if(value.date.getTime() <= expirationDate) {
+                delete this.cacheContent[key];
+            }
+        }
+    }
+
+}
+
+export class CertificateStore {
+    ca: X509Certificate;
+    cache: CertificateCache;
+
+    constructor(ca: string) {
+        this.ca = new X509Certificate(ca);
+    }
+
+    async verifyCertificate(pems: string[], date?: Date): Promise<boolean> {
+        let chain = pems.map(item=>new X509Certificate(item));
+        let result = await verifyCertificate(chain, this.ca, date)
+        if(result && this.cache) {
+            await this.cache.saveCertificate(pems);
+        }
+        return result
+    }
+
+    async verifyMessage(message: MilleGrillesMessage): Promise<boolean> {
+        let timestamp = message.estampille;
+        let messageDate = new Date(timestamp * 1000);
+
+        let publicKey = message.pubkey;
+        let certificateWrapper: CertificateWrapper;
+        if(this.cache) certificateWrapper = await this.cache.getCertificate(publicKey);
+        let chain: X509Certificate[];
+        if(certificateWrapper) {
+            // We got a cache hit. Recover the chain.
+            console.debug("Cache HIT");
+            chain = certificateWrapper.chain;
+            // No need to check the pubkey.
+            // We got a match from the cache so we know the certificate matches this message (or the 
+            // signature check will fail).
+            // We still re-verify the chain to check its validity against the message date.
+        } else {
+            // Cache miss, extract the certificate and parse.
+            chain = message.certificate.map(item=>new X509Certificate(item));
+            // Ensure that the pubkey field and attached certificate match.
+            let certPublickey = chain[0].publicKey;
+            if(certPublickey.algorithm.name !== 'Ed25519') throw new Error("Unsupported algorithm");
+            let publicKeySlice = certPublickey.rawData.slice(certPublickey.rawData.byteLength-32);
+            let publicKeyCert = Buffer.from(publicKeySlice).toString('hex');
+            if(publicKey !== publicKeyCert) throw new Error('Mismatch between pubkey and attached certificate');
+        }
+
+        let result = await verifyCertificate(chain, this.ca, messageDate)
+        if(result && this.cache) {
+            await this.cache.saveCertificate(message.certificate);
+        }
+        return result
+    }
+}
+

@@ -1,6 +1,7 @@
 import * as x509 from "@peculiar/x509";
 import { Crypto } from "@peculiar/webcrypto";
-import { verifyCertificatePem, wrapperFromPems, getIdmg, loadPrivateKeyEd25519, savePrivateKeyEd25519 } from "../lib/certificates"
+import { verifyCertificatePem, wrapperFromPems, getIdmg, loadPrivateKeyEd25519, savePrivateKeyEd25519, CertificateStore, CertificateCache } from "../lib/certificates"
+import { parseMessage } from "../lib/messageStruct";
 
 // Wire crytpo to work on node as in the browser
 const crypto = new Crypto();
@@ -51,6 +52,8 @@ MJyb/Ppa2C6PraSVPgJGWKl+/5S5tBr58KFNg+0H94CH4d1VCPwI
 -----END CERTIFICATE-----`;
 
 const CA_PRIVATE_KEY = new Uint8Array(Buffer.from('01234567890123456789012345678901234567890123456789012345678901234', 'hex'));
+
+const MESSAGE_1 = {"certificate":["-----BEGIN CERTIFICATE-----\nMIICPDCCAe6gAwIBAgIUWw4LLOaWvtl2+e1NKBN1YXuHHywwBQYDK2VwMHIxLTAr\nBgNVBAMTJGEwYmI1ZGJiLTcyZmItNDEzZi05N2ZmLTc5OGQyYWVmMGQ1MDFBMD8G\nA1UEChM4emVZbmNScUVxWjZlVEVtVVo4d2hKRnVIRzc5NmVTdkNUV0U0TTQzMml6\nWHJwMjJiQXR3R203SmYwHhcNMjQwNzE3MTEyODU1WhcNMjQwODE3MTEyOTE1WjCB\nhTEtMCsGA1UEAwwkYTBiYjVkYmItNzJmYi00MTNmLTk3ZmYtNzk4ZDJhZWYwZDUw\nMREwDwYDVQQLDAhjZWR1bGV1cjFBMD8GA1UECgw4emVZbmNScUVxWjZlVEVtVVo4\nd2hKRnVIRzc5NmVTdkNUV0U0TTQzMml6WHJwMjJiQXR3R203SmYwKjAFBgMrZXAD\nIQCv+cw5YWC3IEeb2RAYdik4jBSqIq8PCE+ab2iLyxfNSqOBgTB/MCsGBCoDBAAE\nIzQuc2VjdXJlLDMucHJvdGVnZSwyLnByaXZlLDEucHVibGljMBAGBCoDBAEECGNl\nZHVsZXVyMB8GA1UdIwQYMBaAFLMsL7gWXQsYHdzcwM0+JnFPgEj4MB0GA1UdDgQW\nBBR1sDSSZO4CFbSeOOreef/hQcxN7TAFBgMrZXADQQBlcKnfGnVP7tNWXZRLdnCD\npY7ezNBLcr+4U+D0uxumRnQjj7V/56zK06u/IjKd3PnMB5gRqK7kCGbivO6hAgEH\n-----END CERTIFICATE-----","-----BEGIN CERTIFICATE-----\nMIIBozCCAVWgAwIBAgIKBoEAlpIHYAWTaDAFBgMrZXAwFjEUMBIGA1UEAxMLTWls\nbGVHcmlsbGUwHhcNMjQwNzE3MTEyODA4WhcNMjYwMTI2MTEyODA4WjByMS0wKwYD\nVQQDEyRhMGJiNWRiYi03MmZiLTQxM2YtOTdmZi03OThkMmFlZjBkNTAxQTA/BgNV\nBAoTOHplWW5jUnFFcVo2ZVRFbVVaOHdoSkZ1SEc3OTZlU3ZDVFdFNE00MzJpelhy\ncDIyYkF0d0dtN0pmMCowBQYDK2VwAyEAZ/cAJCrI5igFVQNa2YmgL3CPvERXhlyS\nWvnGAV+4OVGjYzBhMBIGA1UdEwEB/wQIMAYBAf8CAQAwCwYDVR0PBAQDAgEGMB0G\nA1UdDgQWBBSzLC+4Fl0LGB3c3MDNPiZxT4BI+DAfBgNVHSMEGDAWgBTTiP/MFw4D\nDwXqQ/J2LLYPRUkkETAFBgMrZXADQQCmqcjq64U/cKDhGpLV4LE2WNRVloXeUK3z\ntEjszGAVQ+Kr04y/k3FuCVJ1aoLwaZbmPB2CzV9XyQzub2vc/+AO\n-----END CERTIFICATE-----"],"contenu":"{\"b\":true,\"n\":18,\"sub\":{\"a\":\"More text\",\"b\":12},\"value\":\"DUMMY content\"}","estampille":1721592075,"id":"5bd735ce7816b4cdf5eb3d87ee63a40aee7fa580f7cc1bb0e64343aaf27030de","kind":1,"pubkey":"aff9cc396160b720479bd910187629388c14aa22af0f084f9a6f688bcb17cd4a","routage":{"action":"DUMMY ACTION","domaine":"DUMMY domain"},"signature":"ecedc4bfdaa1aa19e0c195696998c1e93a02a6623469477d059e05bbb2b6715d7837b3f2182833cb51746a9125f364e3d533973e2e5b372c7c2be814c47dfa02"};
 
 test('cert-validate 1', async () => {
     const result = await verifyCertificatePem(CERTIFICATE_1, MILLEGRILLE_CERT)
@@ -127,4 +130,41 @@ test('private key save', async () => {
     expect(key).toBe(`-----BEGIN PRIVATE KEY-----
 MC4CAQAwBQYDK2VwBCIEIAEjRWeJASNFZ4kBI0VniQEjRWeJASNFZ4kBI0VniQEj
 -----END PRIVATE KEY-----`);
+})
+
+
+test('test store 1', async ()=>{
+    let store = new CertificateStore(MILLEGRILLE_CERT);
+    let result = await store.verifyCertificate(CERTIFICATE_1);
+    expect(result).toBe(true);
+})
+
+test('test store cache', async ()=>{
+    let store = new CertificateStore(MILLEGRILLE_CERT);
+    store.cache = new CertificateCache();
+    let result = await store.verifyCertificate(CERTIFICATE_1);
+    expect(result).toBe(true);
+
+    let wrapper = await store.cache.getCertificate('4a9cedf45aa5d0269de906a8cb5a692661668eed866de3b89714f61c04aa9c04');
+    expect(wrapper).toBeDefined();
+
+    // Check that cache maintenance works
+    await new Promise(resolve=>setTimeout(resolve, 5));  // Wait 5 ms
+    await store.cache.maintain(1);  // Mark entries older than 1ms as expired
+    wrapper = await store.cache.getCertificate('4a9cedf45aa5d0269de906a8cb5a692661668eed866de3b89714f61c04aa9c04');
+    expect(wrapper).toBeUndefined();
+})
+
+test('test store message', async ()=>{
+    let store = new CertificateStore(MILLEGRILLE_CERT);
+    store.cache = new CertificateCache();
+    let message = parseMessage(JSON.stringify(MESSAGE_1));
+    let result = await store.verifyMessage(message);
+    expect(result).toBe(true);
+    let wrapper = await store.cache.getCertificate('aff9cc396160b720479bd910187629388c14aa22af0f084f9a6f688bcb17cd4a');
+    expect(wrapper).toBeDefined();
+
+    // No real way to check for a cache hit...
+    let result2 = await store.verifyMessage(message);
+    expect(result2).toBe(true);
 })

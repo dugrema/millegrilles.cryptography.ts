@@ -1,6 +1,7 @@
+import stringify from 'json-stable-stringify';
 import { loadPrivateKeyEd25519, wrapperFromPems } from '../lib/certificates';
 import { newMessageSigningKey } from '../lib/ed25519';
-import { MessageKind, createRoutedMessage, MilleGrillesMessage, Routage, createResponse, createEncryptedResponse } from '../lib/messageStruct'
+import { MessageKind, createRoutedMessage, MilleGrillesMessage, Routage, createResponse, createEncryptedResponse, parseMessage } from '../lib/messageStruct'
 
 const PRIVATE_KEY = new Uint8Array(Buffer.from('01234567890123456789012345678901234567890123456789012345678901234', 'hex'));
 const CERTIFICATE_1 = [
@@ -135,3 +136,25 @@ test('create encrypted response', async () => {
     // Compare content to confirm round-trip
     expect(cleartextContent).toStrictEqual(content);
 });
+
+
+test('serialize-deserialize message', async () => {
+    let certificateWrapper = wrapperFromPems(CERTIFICATE_1)
+    let privateKey = loadPrivateKeyEd25519(PRIVATE_KEY_1);
+    let signingKey = await newMessageSigningKey(privateKey, certificateWrapper);
+    let content = {value: "DUMMY content", n: 18, b: true, sub: {b: 12, a: "More text"}};
+    let routing: Routage = {domaine: "DUMMY domain", action: "DUMMY ACTION"};
+    let timestamp = new Date(1721592075000);
+    let message = await createRoutedMessage(signingKey, MessageKind.Request, content, routing, timestamp);
+
+    let jsonMessage = stringify(message);
+    console.debug("JSON message : ", jsonMessage);
+
+    let deserializedMessage = parseMessage(jsonMessage);
+    console.debug("Deserialized message ", deserializedMessage);
+    let result = await deserializedMessage.verify();
+    expect(result).toBe(true);
+
+    // Compare content to confirm round-trip
+    expect(await message.getContent()).toStrictEqual(content);
+})

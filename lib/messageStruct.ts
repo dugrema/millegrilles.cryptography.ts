@@ -264,3 +264,19 @@ async function decryptMessageContent(
 
     return new TextDecoder().decode(output);
 }
+
+export function parseMessage(message: string): MilleGrillesMessage {
+    let obj = JSON.parse(message);
+    
+    // Create an instance
+    let m = new MilleGrillesMessage(obj.estampille, obj.kind, obj.contenu);
+
+    // Copy all fields
+    Object.keys(obj).forEach(key=>{
+        if(!m[key]) {
+            m[key] = obj[key];
+        }
+    })
+    
+    return m;
+}
