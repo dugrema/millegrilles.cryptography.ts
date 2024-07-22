@@ -148,10 +148,8 @@ test('serialize-deserialize message', async () => {
     let message = await createRoutedMessage(signingKey, MessageKind.Request, content, routing, timestamp);
 
     let jsonMessage = stringify(message);
-    console.debug("JSON message : ", jsonMessage);
 
     let deserializedMessage = parseMessage(jsonMessage);
-    console.debug("Deserialized message ", deserializedMessage);
     let result = await deserializedMessage.verify();
     expect(result).toBe(true);
 

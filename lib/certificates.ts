@@ -316,7 +316,6 @@ export class CertificateCache {
         let expirationDate = new Date().getTime() - expiration;
         for(let key of keys) {
             let value = this.cacheContent[key];
-            console.debug("Expiration date : %O, entry date : %O", expirationDate, value.date.getTime())
             if(value.date.getTime() <= expirationDate) {
                 delete this.cacheContent[key];
             }
@@ -352,7 +351,6 @@ export class CertificateStore {
         let chain: X509Certificate[];
         if(certificateWrapper) {
             // We got a cache hit. Recover the chain.
-            //console.debug("Cache HIT");
             chain = certificateWrapper.chain;
             // No need to check the pubkey.
             // We got a match from the cache so we know the certificate matches this message (or the 
