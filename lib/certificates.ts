@@ -296,6 +296,7 @@ export class CertificateCache {
 
         // Save the wrapper with the public key as identifier.
         let wrapper = new CertificateWrapper(chain)
+        wrapper.populateExtensions()
         this.cacheContent[wrapper.getPublicKey()] = {wrapper, date: new Date()};
 
         return wrapper;
