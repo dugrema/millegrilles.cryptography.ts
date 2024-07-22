@@ -1,6 +1,10 @@
 import { BasicConstraintsExtension, X509Certificate, Extension } from "@peculiar/x509";
 import { baseEncode, getMultihashBytes } from './multiencoding'
 import { digest } from "./digest";
+import { AsnConvert, OctetString } from "@peculiar/asn1-schema";
+import { PrivateKeyInfo } from "@peculiar/asn1-asym-key";
+import { AlgorithmIdentifier } from '@peculiar/asn1-x509';
+import { PrivateKey as PrivateKeyPkcs8, PrivateKeyInfo as PrivateKeyInfoPkcs8 } from '@peculiar/asn1-pkcs8';
 
 // Custom x509v3 OID extensions for MilleGrille certificates
 const OID_EXCHANGES = "1.2.3.4.0";
@@ -114,7 +118,19 @@ export class CertificateWrapper {
         const publicKey = this.certificate.publicKey;
         if(publicKey.algorithm.name !== 'Ed25519') throw new Error("Unsupported algorithm");
         // Extract the EC public key from this ASN.1 structure
-        const publicKeySlice = publicKey.rawData.slice(13);
+        const publicKeySlice = publicKey.rawData.slice(publicKey.rawData.byteLength-32);
+        // Return in hex format
+        return Buffer.from(publicKeySlice).toString('hex');
+    }
+
+    getMillegrillePublicKey(): string {
+        if(!this.millegrille) throw new Error("The millegrille certificate was not provided");
+
+        const publicKey = this.millegrille.publicKey;
+        if(publicKey.algorithm.name !== 'Ed25519') throw new Error("Unsupported algorithm");
+        // Extract the EC public key from this ASN.1 structure
+        const publicKeySlice = publicKey.rawData.slice(publicKey.rawData.byteLength-32);
+
         // Return in hex format
         return Buffer.from(publicKeySlice).toString('hex');
     }
@@ -195,4 +211,49 @@ function _idmgExpirationTo32Uint(notAfter: Date): Uint8Array {
     view32Uint[0] = dateExpEpoch_1000
   
     return new Uint8Array(bufferExpiration);
+}
+
+const CERTIFICATE_END = '-----END CERTIFICATE-----';
+
+export function splitCertificatePems(pems: string) {
+    return pems.split(CERTIFICATE_END).map(item=>item+CERTIFICATE_END)
+}
+
+const KEY_BEGIN = '-----BEGIN PRIVATE KEY-----';
+const KEY_END = '-----END PRIVATE KEY-----';
+
+export function loadPrivateKeyEd25519(pem: string, password?: string) {
+    if(password) throw new Error('not implemented');
+
+    let keyString = pem.replace(KEY_BEGIN, '').replace(KEY_END, '').replace(/\\r\\n/g, '');
+    let keyBytes = Buffer.from(keyString, 'base64');
+    let ecParams = AsnConvert.parse(keyBytes, PrivateKeyInfo);
+    let privateKey = ecParams.privateKey.slice(ecParams.privateKey.byteLength-32);
+    return privateKey
+}
+
+export function savePrivateKeyEd25519(key: Uint8Array, password?: string): string {
+    if(key.length != 32) throw new Error("The private key must by 32 bytes in length");
+    const algorithm = new AlgorithmIdentifier({
+        algorithm: '1.3.101.112',
+    });
+
+    if(password) throw new Error('not implemented');
+
+    // From : https://github.com/PeculiarVentures/asn1-schema/issues/82
+
+    // CurvePrivateKey ::= OCTET STRING
+    const curvePrivateKey = new OctetString(key.length);
+    // copy raw
+    const edPrivateKeyView = new Uint8Array(curvePrivateKey.buffer);
+    edPrivateKeyView.set(key);
+
+    const pkcs8 = new PrivateKeyInfoPkcs8({
+        privateKeyAlgorithm: algorithm,
+        privateKey: new PrivateKeyPkcs8(AsnConvert.serialize(curvePrivateKey)),
+    });
+    let keyBase64 = Buffer.from(AsnConvert.serialize(pkcs8)).toString("base64")
+    
+    let pemList = [KEY_BEGIN, keyBase64, KEY_END];
+    return pemList.join('\n')
 }

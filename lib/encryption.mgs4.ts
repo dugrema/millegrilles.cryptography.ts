@@ -4,15 +4,20 @@ import { createBLAKE2b } from 'hash-wasm';
 import { IHasher } from 'hash-wasm/dist/lib/WASMInterface';
 
 export async function getMgs4Cipher() {
+    // Generate new key
+    let secretKey = getRandom(32);
+    return await getMgs4CipherWithSecret(secretKey)
+}
+
+export async function getMgs4CipherWithSecret(secretKey: Uint8Array) {
     await _sodium.ready;
     const sodium = _sodium;
 
     // Generate new key
-    let key = getRandom(32);
-    let {state, header} = sodium.crypto_secretstream_xchacha20poly1305_init_push(key);
+    let {state, header} = sodium.crypto_secretstream_xchacha20poly1305_init_push(secretKey);
     let hasher = await createBLAKE2b();
     hasher.init();
-    return new Mgs4Cipher(key, state, header, hasher);
+    return new Mgs4Cipher(secretKey, state, header, hasher);
 }
 
 const MGS4_ENCRYPT_BLOCK_SIZE = 1024 * 64 - 17;

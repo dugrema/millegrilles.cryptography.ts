@@ -1,8 +1,9 @@
 import { digest } from './digest';
-import { baseEncode, baseDecode } from './multiencoding';
+import { baseEncode, baseDecode, encodeBase64Nopad } from './multiencoding';
 import { encryptChacha20Poly1305, decryptChacha20Poly1305 } from './encryption'
 import { generateKeypairEd5519 } from './ed25519';
 import _sodium from 'libsodium-wrappers';
+import { encodeBase64 } from 'hash-wasm/dist/lib/util';
 
 type SecretFromEd25519Result = {
     secret: Uint8Array,     // Secret value to use
@@ -35,7 +36,7 @@ export async function secretFromEd25519(publicKey: Uint8Array) : Promise<SecretF
     if(!ArrayBuffer.isView(digestedSecret)) throw new Error("digest wrong response type");  // Check type
     
     // Convert the public peer value to a string. Allows to serialize it as part of a json message.
-    const newPublicX25519String = baseEncode('base64', newX25519PublicKey);
+    const newPublicX25519String = encodeBase64Nopad(newX25519PublicKey);
 
     return {
         secret: digestedSecret,

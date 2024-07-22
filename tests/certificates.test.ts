@@ -1,6 +1,6 @@
 import * as x509 from "@peculiar/x509";
 import { Crypto } from "@peculiar/webcrypto";
-import { verifyCertificatePem, wrapperFromPems, getIdmg } from "../lib/certificates"
+import { verifyCertificatePem, wrapperFromPems, getIdmg, loadPrivateKeyEd25519, savePrivateKeyEd25519 } from "../lib/certificates"
 
 // Wire crytpo to work on node as in the browser
 const crypto = new Crypto();
@@ -36,6 +36,10 @@ tEjszGAVQ+Kr04y/k3FuCVJ1aoLwaZbmPB2CzV9XyQzub2vc/+AO
 -----END CERTIFICATE-----`
 ]
 
+const PRIVATE_1 = `-----BEGIN PRIVATE KEY-----
+MC4CAQAwBQYDK2VwBCIEIA7VRb79082AF1FmkaveVcENAUGjNZDAb2fvcdYxnqV/
+-----END PRIVATE KEY-----`
+
 const MILLEGRILLE_CERT = `-----BEGIN CERTIFICATE-----
 MIIBQzCB9qADAgECAgoHBykXJoaCCWAAMAUGAytlcDAWMRQwEgYDVQQDEwtNaWxs
 ZUdyaWxsZTAeFw0yMjAxMTMyMjQ3NDBaFw00MjAxMTMyMjQ3NDBaMBYxFDASBgNV
@@ -44,7 +48,9 @@ BAMTC01pbGxlR3JpbGxlMCowBQYDK2VwAyEAnnixameVCZAzfx4dO+L63DOk/34I
 A1UdDgQWBBTTiP/MFw4DDwXqQ/J2LLYPRUkkETAfBgNVHSMEGDAWgBTTiP/MFw4D
 DwXqQ/J2LLYPRUkkETAFBgMrZXADQQBSb0vXhw3pw25qrWoMjqROjawe7/kMlu7p
 MJyb/Ppa2C6PraSVPgJGWKl+/5S5tBr58KFNg+0H94CH4d1VCPwI
------END CERTIFICATE-----`
+-----END CERTIFICATE-----`;
+
+const CA_PRIVATE_KEY = new Uint8Array(Buffer.from('01234567890123456789012345678901234567890123456789012345678901234', 'hex'));
 
 test('cert-validate 1', async () => {
     const result = await verifyCertificatePem(CERTIFICATE_1, MILLEGRILLE_CERT)
@@ -59,7 +65,7 @@ test('cert-wrapper 1', async () => {
 test('cert-wrapper-publicKey', async () => {
     const certificateWrapper = wrapperFromPems(CERTIFICATE_1)
     const publicKey = certificateWrapper.getPublicKey()
-    expect(publicKey).toStrictEqual('9cedf45aa5d0269de906a8cb5a692661668eed866de3b89714f61c04aa9c04')
+    expect(publicKey).toStrictEqual('4a9cedf45aa5d0269de906a8cb5a692661668eed866de3b89714f61c04aa9c04')
 });
 
 test('cert-wrapper-verify-date', async () => {
@@ -108,4 +114,17 @@ test('cert-wrapper-verify-commonName', async () => {
 test('cert-getIdmg', async () => {
     let idmg = await getIdmg(MILLEGRILLE_CERT)
     expect(idmg).toStrictEqual('zeYncRqEqZ6eTEmUZ8whJFuHG796eSvCTWE4M432izXrp22bAtwGm7Jf')
+})
+
+test('private key load', async() => {
+    let key = loadPrivateKeyEd25519(PRIVATE_1);
+    expect(Buffer.from(key))
+        .toStrictEqual(Buffer.from('0ed545befdd3cd8017516691abde55c10d0141a33590c06f67ef71d6319ea57f', 'hex'));
+})
+
+test('private key save', async () => {
+    let key = savePrivateKeyEd25519(CA_PRIVATE_KEY);
+    expect(key).toBe(`-----BEGIN PRIVATE KEY-----
+MC4CAQAwBQYDK2VwBCIEIAEjRWeJASNFZ4kBI0VniQEjRWeJASNFZ4kBI0VniQEj
+-----END PRIVATE KEY-----`);
 })

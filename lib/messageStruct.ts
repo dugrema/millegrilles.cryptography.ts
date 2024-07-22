@@ -2,6 +2,10 @@ import stringify from 'json-stable-stringify'
 import { digest } from './digest';
 import { MessageSigningKey, verifyMessageSignature } from './ed25519';
 import { CertificateWrapper } from './certificates';
+import { getMgs4CipherWithSecret } from './encryption.mgs4';
+import { secretFromEd25519, secretFromEd25519PrivateX25519Peer } from './x25519';
+import { encodeBase64Nopad } from './multiencoding';
+import { DomainSignature } from './keymaster';
 
 export enum MessageKind {
     Document = 0,
@@ -15,11 +19,20 @@ export enum MessageKind {
     EncryptedCommand = 8,
 }
 
-export type Routage = {};
+export type Routage = {domaine?: string, action?: string, partition?: string};
 
 export type PreMigration = {};
 
-export type MessageDecryption = {};
+export type MessageDecryption = {
+    cle_id?: string,
+    cles?: Object,
+    format: string,
+    hachage?: string,
+    header?: string,
+    nonce?: string,
+    signature?: DomainSignature,
+    verification?: string,
+};
 
 export class MilleGrillesMessage {
     estampille: number;  // Timestamp in epoch (seconds)
@@ -53,6 +66,19 @@ export class MilleGrillesMessage {
         let messageId = await generateMessageId(this);
         if(this.id !== messageId) throw new Error("Message digest is invalid");
         return await verifyMessage(this);
+    }
+
+    async getContent(decryptionKey?: MessageSigningKey): Promise<Object> {
+        if(![MessageKind.EncryptedResponse, MessageKind.EncryptedCommand].includes(this.kind)) {
+            // This is not an encrypted message. The content is a JSON string.
+            return JSON.parse(this.contenu);
+        }
+
+        // This is an encrytped message.
+        if(!decryptionKey) throw new Error("The message is encrypted. The decryption key must be provided.");
+        if(!this.dechiffrage) throw new Error("The message is encrypted but is missing the decryption information.");
+
+        return await decryptMessageContent(decryptionKey, this.kind, this.dechiffrage, this.contenu);
     }
 };
 
@@ -166,11 +192,55 @@ async function createSimpleMessage(
 export async function createEncryptedResponse(
     signingKey: MessageSigningKey, encryptionKeys: CertificateWrapper[], content: Object, timestamp?: Date
 ): Promise<MilleGrillesMessage> {
-    throw new Error('not implemented')
+
+    let millegrilleKeyHex = signingKey.certificate.getMillegrillePublicKey();
+    let millegrilleKeyBytes = Buffer.from(millegrilleKeyHex, 'hex');
+    let secret = await secretFromEd25519(millegrilleKeyBytes);
+    let cipher = await getMgs4CipherWithSecret(secret.secret);
+
+    // Convert content to binary
+    let contentBytes = new TextEncoder().encode(stringify(content));
+
+    // Encrypt content, serialize with base64nopad
+    let outputBuffers = [];
+    outputBuffers.push(await cipher.update(contentBytes));
+    outputBuffers.push(await cipher.finalize());
+    outputBuffers = outputBuffers.filter(item=>item)  // Remove null buffers
+    let output = Buffer.concat(outputBuffers);
+    let contentString = encodeBase64Nopad(output);
+
+    let cles = {};
+    for(let encryptionKey of encryptionKeys) {
+        let publicKey = encryptionKey.getPublicKey();
+        let publicKeyBytes = Buffer.from(publicKey, 'hex');
+        let encryptedSecret = await secretFromEd25519PrivateX25519Peer(secret.secret, publicKeyBytes);
+        cles[publicKey] = encodeBase64Nopad(encryptedSecret);
+    }
+
+    // Populate decryption information
+    let decryption: MessageDecryption = {
+        cles,
+        format: 'mgs4',
+        nonce: encodeBase64Nopad(cipher.header),
+    }
+
+    if(!timestamp) timestamp = new Date();
+    let timestampEpoch: number = Math.floor(timestamp.getTime() / 1000);
+    let message = new MilleGrillesMessage(timestampEpoch, MessageKind.EncryptedResponse, contentString);
+    message.dechiffrage = decryption;
+    await message.sign(signingKey);
+
+    return message;
 }
 
 export async function createEncryptedCommand(
     signingKey: MessageSigningKey, encryptionKeys: CertificateWrapper[], content: Object, routing: Routage, timestamp?: Date
 ): Promise<MilleGrillesMessage> {
     throw new Error('not implemented')
+}
+
+async function decryptMessageContent(
+    decryptionKey: MessageSigningKey, kind: MessageKind, decryption: MessageDecryption, content: string
+): Promise<Object> {
+    throw new Error('todo')
 }

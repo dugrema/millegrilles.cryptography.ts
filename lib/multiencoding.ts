@@ -51,6 +51,15 @@ export function baseDecode(value: string): Uint8Array {
     return multibase.decode(value)
 }
 
+/**
+ * @returns Base64 encoded value with no '=' padding
+ * @param value Binary value to encode
+ */
+export function encodeBase64Nopad(value: Uint8Array): string {
+    // Return the encoded value without the multibase 'm' flag
+    return String.fromCharCode.apply(null, multibase.encode('base64', value).slice(1))
+}
+
 type MultihashDecodeResult = {
     name: multihash.HashName,
     digest: Uint8Array,
