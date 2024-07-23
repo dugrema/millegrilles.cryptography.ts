@@ -27,3 +27,14 @@ export async function decryptChacha20Poly1305(content: Uint8Array, nonce: Uint8A
     const cleartext = sodium.crypto_aead_chacha20poly1305_ietf_decrypt(null, content, null, nonce, key)
     return new Uint8Array(cleartext)
 }
+
+export function concatBuffers(arrays: Uint8Array[]) {
+    let outputLength = arrays.reduce((acc, item)=>acc+item.length, 0)
+    let buffer = new Uint8Array(outputLength);
+    let position = 0;
+    for(let output of arrays) {
+        buffer.set(output, position);
+        position += output.length;
+    }
+    return buffer;
+}

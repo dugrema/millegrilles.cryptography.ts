@@ -6,6 +6,7 @@ import { getMgs4CipherWithSecret, getMgs4Decipher } from './encryption.mgs4';
 import { decryptEd25519, encryptEd25519, secretFromEd25519 } from './x25519';
 import { decodeBase64Nopad, decodeHex, encodeBase64Nopad, encodeHex } from './multiencoding';
 import { DomainSignature } from './keymaster';
+import { concatBuffers } from './encryption';
 
 export enum MessageKind {
     Document = 0,
@@ -209,7 +210,7 @@ export async function createEncryptedResponse(
     outputBuffers.push(await cipher.update(contentBytes));
     outputBuffers.push(await cipher.finalize());
     outputBuffers = outputBuffers.filter(item=>item)  // Remove null buffers
-    let output = Buffer.concat(outputBuffers);
+    let output = concatBuffers(outputBuffers);
     let contentString = encodeBase64Nopad(output);
 
     let cles = {};
@@ -261,7 +262,7 @@ async function decryptMessageContent(
     outputBuffers.push(await decipher.update(contentBytes));
     outputBuffers.push(await decipher.finalize());
     outputBuffers = outputBuffers.filter(item=>item);  // Remove null buffers
-    let output = Buffer.concat(outputBuffers);
+    let output = concatBuffers(outputBuffers);
 
     return new TextDecoder().decode(output);
 }
