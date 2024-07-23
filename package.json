@@ -1,9 +1,14 @@
 {
   "name": "millegrilles.cryptography.ts",
   "version": "2024.6.0",
-  "main": "index.js",
+  "main": "build/cryptography.cjs.js",
+  "module": "build/cryptography.es.js",
+  "types": "build/cryptography.d.ts",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "build": "npm run build:module",
+    "build:module": "rollup -c",
+    "rebuild": "npm run clear && npm run build"
   },
   "keywords": [
     "millegrilles"
@@ -12,11 +17,24 @@
   "license": "ISC",
   "description": "Data model for MilleGrilles in typescript",
   "devDependencies": {
+    "@babel/preset-env": "^7.24.8",
+    "@rollup/plugin-babel": "^6.0.4",
+    "@rollup/plugin-commonjs": "^26.0.1",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-terser": "^0.4.4",
     "@types/jest": "29.5.12",
     "@types/json-stable-stringify": "1.0.36",
     "@types/libsodium-wrappers": "0.7.14",
+    "@typescript-eslint/eslint-plugin": "^7.17.0",
+    "@typescript-eslint/parser": "^7.17.0",
+    "eslint": "^8.57.0",
     "jest": "29.7.0",
+    "rollup-plugin-dts": "^6.1.1",
+    "rollup-plugin-import-assertions": "^0.5.0",
+    "rollup-plugin-polyfill-node": "^0.13.0",
+    "rollup-plugin-typescript2": "^0.36.0",
     "ts-jest": "29.2.3",
+    "ts-node": "^10.9.2",
     "typescript": "5.5.3"
   },
   "dependencies": {
@@ -32,7 +50,16 @@
     "json-stable-stringify": "1.1.1",
     "libsodium-wrappers": "0.7.14",
     "multibase": "4.0.6",
-    "multihashes": "4.0.3"
+    "multihashes": "4.0.3",
+    "reflect-metadata": "^0.2.2"
   },
-  "type": "module"
+  "type": "module",
+  "files": [
+    "build/**/*.{ts,js}",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    "./digest": "./lib/digest.ts"
+  }
 }
