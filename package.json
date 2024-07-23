@@ -1,9 +1,9 @@
 {
   "name": "millegrilles.cryptography.ts",
   "version": "2024.6.0",
-  "main": "build/cryptography.cjs.js",
-  "module": "build/cryptography.es.js",
-  "types": "build/cryptography.d.ts",
+  "main": "dist/index.cjs.js",
+  "module": "dist/index.es.js",
+  "types": "dist/index.d.ts",
   "scripts": {
     "test": "jest",
     "build": "npm run build:module",
@@ -55,11 +55,15 @@
   },
   "type": "module",
   "files": [
-    "build/**/*.{ts,js}",
-    "README.md",
-    "LICENSE"
+    "src",
+    "dist",
+    "!tests",
+    "README.md"
   ],
   "exports": {
-    "./digest": "./lib/digest.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.es.js"
+    }
   }
 }
