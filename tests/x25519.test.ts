@@ -2,8 +2,8 @@ import { secretFromEd25519, secretFromEd25519PrivateX25519Peer, encryptEd25519, 
 import { decodeBase64Nopad } from '../lib/multiencoding'
 import _sodium from 'libsodium-wrappers';
 
-const CA_PRIVATE_KEY = new Uint8Array(Buffer.from('01234567890123456789012345678901234567890123456789012345678901234', 'hex'));
-const SECRET_KEY = new Uint8Array(Buffer.from('23456789012345678901234567890123456789012345678901234567890123456', 'hex'));
+const CA_PRIVATE_KEY = new Uint8Array(Buffer.from('0123456789012345678901234567890123456789012345678901234567890123', 'hex'));
+const SECRET_KEY = new Uint8Array(Buffer.from('2345678901234567890123456789012345678901234567890123456789012345', 'hex'));
 
 test('secretExchangeEd25519', async () => {
     await _sodium.ready;

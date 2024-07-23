@@ -4,19 +4,23 @@
  */
 export function getRandom(byteLen: number): Uint8Array {
     let abView: Uint8Array;
-    let crypto: any;
+    let cryptoHandle: any;
     if( typeof(window) !== 'undefined' && window.crypto) {
         // Browser
-        crypto = window.crypto;
+        cryptoHandle = window.crypto;
         const randomAB = new ArrayBuffer(byteLen);
         abView = new Uint8Array(randomAB);
-        crypto.getRandomValues(abView);
+        cryptoHandle.getRandomValues(abView);
     } else if( typeof(self) !== 'undefined' && self.crypto ) {
         // Browser web worker
-        crypto = self.crypto;
+        cryptoHandle = self.crypto;
         const randomAB = new ArrayBuffer(byteLen);
         abView = new Uint8Array(randomAB);
-        crypto.getRandomValues(abView);
+        cryptoHandle.getRandomValues(abView);
+    } else if( typeof(crypto) !== 'undefined' ) {
+        // Nodejs
+        abView = new Uint8Array(byteLen);
+        abView = crypto.getRandomValues(abView);
     } else {
         throw new Error('random generator not available');
     }

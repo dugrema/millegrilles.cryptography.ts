@@ -3,7 +3,7 @@ import { loadPrivateKeyEd25519, wrapperFromPems } from '../lib/certificates';
 import { newMessageSigningKey } from '../lib/ed25519';
 import { MessageKind, createRoutedMessage, MilleGrillesMessage, Routage, createResponse, createEncryptedResponse, parseMessage } from '../lib/messageStruct'
 
-const PRIVATE_KEY = new Uint8Array(Buffer.from('01234567890123456789012345678901234567890123456789012345678901234', 'hex'));
+const PRIVATE_KEY = new Uint8Array(Buffer.from('0123456789012345678901234567890123456789012345678901234567890123', 'hex'));
 const CERTIFICATE_1 = [
     `-----BEGIN CERTIFICATE-----
 MIICPDCCAe6gAwIBAgIUWw4LLOaWvtl2+e1NKBN1YXuHHywwBQYDK2VwMHIxLTAr
