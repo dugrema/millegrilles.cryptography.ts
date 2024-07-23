@@ -20,6 +20,7 @@ const external = Object.keys(pkg.dependencies)
 const main = {
   input,
   plugins: [
+    nodePolyfills({include: ["fs", "path", "crypto"]}),
     typescript({
       check: true,
       clean: true,
