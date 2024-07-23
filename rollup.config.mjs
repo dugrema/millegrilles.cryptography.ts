@@ -52,7 +52,7 @@ const browser = [
   {
     input,
     plugins: [
-      nodePolyfills({include: ["fs", "path", "crypto", "buffer"], crypto: true}),
+      nodePolyfills({include: ["crypto"]}),
       resolve({
         mainFields: ["esnext", "module", "main"],
         preferBuiltins: true,
