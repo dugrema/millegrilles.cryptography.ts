@@ -20,7 +20,6 @@ const external = Object.keys(pkg.dependencies)
 const main = {
   input,
   plugins: [
-    nodePolyfills({include: ["fs", "path", "crypto"]}),
     typescript({
       check: true,
       clean: true,
@@ -53,7 +52,7 @@ const browser = [
   {
     input,
     plugins: [
-      nodePolyfills({include: ["fs", "path", "crypto"]}),
+      nodePolyfills({include: ["fs", "path", "crypto", "buffer"], crypto: true}),
       resolve({
         mainFields: ["esnext", "module", "main"],
         preferBuiltins: true,
