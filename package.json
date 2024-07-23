@@ -8,7 +8,8 @@
     "test": "jest",
     "build": "npm run build:module",
     "build:module": "rollup -c",
-    "rebuild": "rimraf dist && npm run build"
+    "rebuild": "rimraf dist && npm run build",
+    "prepare": "npm run build:module"
   },
   "keywords": [
     "millegrilles"
