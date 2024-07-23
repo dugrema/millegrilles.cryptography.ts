@@ -1,8 +1,8 @@
 import _sodium from 'libsodium-wrappers';
 import stringify from "json-stable-stringify";
-import { generateKeypairEd5519, MessageSigningKey, signMessage, verifyMessageSignature } from "./ed25519";
+import { generateKeypairEd5519, signMessage, verifyMessageSignature } from "./ed25519";
 import { digest } from "./digest";
-import { baseDecode, baseEncode } from "./multiencoding";
+import { baseDecode } from "./multiencoding";
 
 const CURRENT_VERSION = 1;
 

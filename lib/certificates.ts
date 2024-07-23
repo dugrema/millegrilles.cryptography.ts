@@ -54,9 +54,11 @@ export async function verifyCertificate(chain: X509Certificate[], ca: X509Certif
     let parentKey = ca.publicKey;  // Initialise verification with the CA key (self-signed, checks itself)
     for(let cert of certs) {
         if(!parentKey) throw new Error("Invalid chain, at least one signing certificate does not have the CA flag");
-
         let result = await cert.verify({date: validationDate, publicKey: parentKey, signatureOnly: false});
-        if(!result) throw new Error("Invalid certificate");
+        if(!result) {
+            // console.warn("invalid certificate (result:%O), %O (parentKey: %O)", result, cert, parentKey);
+            throw new Error("Invalid certificate");
+        }
         
         const basicExtensions: BasicConstraintsExtension = ca.getExtension('2.5.29.19');
         if(basicExtensions && basicExtensions.ca === true) {
@@ -228,8 +230,8 @@ const KEY_END = '-----END PRIVATE KEY-----';
 export function loadPrivateKeyEd25519(pem: string, password?: string): Uint8Array {
     if(password) throw new Error('not implemented');
 
-    let keyString = pem.replace(KEY_BEGIN, '').replace(KEY_END, '').replace(/\\r\\n/g, '');
-    let keyBytes = decodeBase64(keyString.trim());
+    let keyString = pem.replace(KEY_BEGIN, '').replace(KEY_END, '').replace(/[\n\r]/g, '');
+    let keyBytes = decodeBase64(keyString);
     let ecParams = AsnConvert.parse(keyBytes, PrivateKeyInfo);
     let privateKey = ecParams.privateKey.slice(ecParams.privateKey.byteLength-32);
     return new Uint8Array(privateKey)
