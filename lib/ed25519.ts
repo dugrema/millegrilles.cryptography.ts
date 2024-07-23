@@ -1,6 +1,6 @@
 import _sodium from 'libsodium-wrappers';
 import { getRandom } from './random';
-import { baseEncode, baseDecode } from './multiencoding';
+import { baseEncode, baseDecode, decodeHex, encodeHex } from './multiencoding';
 import { CertificateWrapper, loadPrivateKeyEd25519, splitCertificatePems, wrapperFromPems } from './certificates';
 
 type Ed25519KeyPair = {public: Uint8Array, private: Uint8Array};
@@ -24,7 +24,7 @@ export async function signMessage(privateKey: Uint8Array, digest: string | Uint8
     const sodium = _sodium;
 
     if(typeof(digest) === 'string') {
-        digest = Buffer.from(digest, 'hex');
+        digest = decodeHex(digest);
     }
 
     const privateKeyFull = sodium.crypto_sign_seed_keypair(privateKey).privateKey;
@@ -37,7 +37,7 @@ export async function verifyMessageSignature(publicKey: Uint8Array, digest: stri
     const sodium = _sodium;
 
     if(typeof(digest) === 'string') {
-        digest = Buffer.from(digest, 'hex');
+        digest = decodeHex(digest);
     }
 
     if(typeof(signature) === 'string') {
@@ -56,7 +56,7 @@ export class MessageSigningKey {
 
     constructor(key: Ed25519KeyPair, certificate: CertificateWrapper) {
         this.key = key;
-        this.publicKey = Buffer.from(key.public).toString('hex')
+        this.publicKey = encodeHex(key.public);
         this.certificate = certificate;
     }
 
@@ -64,7 +64,7 @@ export class MessageSigningKey {
         await _sodium.ready;
         const sodium = _sodium;
         const signature = sodium.crypto_sign_detached(value, this.key.private);
-        return Buffer.from(signature).toString('hex');
+        return encodeHex(signature);
     }
 
     async verify(signature: Uint8Array, value: Uint8Array): Promise<boolean> {

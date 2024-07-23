@@ -4,7 +4,7 @@ import { MessageSigningKey, verifyMessageSignature } from './ed25519';
 import { CertificateWrapper } from './certificates';
 import { getMgs4CipherWithSecret, getMgs4Decipher } from './encryption.mgs4';
 import { decryptEd25519, encryptEd25519, secretFromEd25519 } from './x25519';
-import { decodeBase64Nopad, encodeBase64Nopad } from './multiencoding';
+import { decodeBase64Nopad, decodeHex, encodeBase64Nopad, encodeHex } from './multiencoding';
 import { DomainSignature } from './keymaster';
 
 export enum MessageKind {
@@ -131,14 +131,15 @@ async function generateMessageId(message: MilleGrillesMessage): Promise<string> 
     
     // Digest with blake2s-256 to hex
     let digestBytes = await digest(output, {digestName: 'blake2s-256', encoding: 'bytes'})
-    let digestString = Buffer.from(digestBytes).toString('hex');
+    if(typeof(digestBytes) === 'string') throw new Error("digest wrong type");
+    let digestString = encodeHex(digestBytes);
     
     return digestString;
 }
 
 async function signMessage(message: MilleGrillesMessage, key: MessageSigningKey): Promise<string> {
     if(!message.id) throw new Error("Message id is missing");
-    let messageId = Buffer.from(message.id, 'hex');
+    let messageId = decodeHex(message.id);
     let signature = await key.sign(messageId);
     message.certificate = key.certificate.pemChain;
     return signature
@@ -146,9 +147,9 @@ async function signMessage(message: MilleGrillesMessage, key: MessageSigningKey)
 
 async function verifyMessage(message: MilleGrillesMessage): Promise<boolean> {
     if(!message.id) throw new Error("Message id is missing");
-    let messageId = Buffer.from(message.id, 'hex');
-    let signatureBytes = Buffer.from(message.signature, 'hex');
-    let pubkey = Buffer.from(message.pubkey, 'hex');
+    let messageId = decodeHex(message.id);
+    let signatureBytes = decodeHex(message.signature);
+    let pubkey = decodeHex(message.pubkey);
     return await verifyMessageSignature(pubkey, messageId, signatureBytes);
 }
 
@@ -196,7 +197,7 @@ export async function createEncryptedResponse(
 ): Promise<MilleGrillesMessage> {
 
     let millegrilleKeyHex = signingKey.certificate.getMillegrillePublicKey();
-    let millegrilleKeyBytes = Buffer.from(millegrilleKeyHex, 'hex');
+    let millegrilleKeyBytes = decodeHex(millegrilleKeyHex);
     let secret = await secretFromEd25519(millegrilleKeyBytes);
     let cipher = await getMgs4CipherWithSecret(secret.secret);
 
@@ -214,7 +215,7 @@ export async function createEncryptedResponse(
     let cles = {};
     for(let encryptionKey of encryptionKeys) {
         let publicKey = encryptionKey.getPublicKey();
-        let publicKeyBytes = Buffer.from(publicKey, 'hex');
+        let publicKeyBytes = decodeHex(publicKey);
         let encryptedSecret = await encryptEd25519(secret.secret, publicKeyBytes);
         cles[publicKey] = encryptedSecret;
     }

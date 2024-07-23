@@ -57,11 +57,40 @@ export function baseDecode(value: string): Uint8Array {
  */
 export function encodeBase64Nopad(value: Uint8Array): string {
     // Return the encoded value without the multibase 'm' flag
-    return String.fromCharCode.apply(null, multibase.encode('base64', value).slice(1))
+    return String.fromCharCode.apply(null, multibase.encode('base64', value).slice(1));
 }
 
 export function decodeBase64Nopad(value: string): Uint8Array {
-    return multibase.decode('m'+value)
+    // return decodeBase64(value);
+    return multibase.decode('m'+value);
+}
+
+export function encodeBase64(value: Uint8Array): string {
+    // Return the encoded value without the multibase 'm' flag
+    return String.fromCharCode.apply(null, multibase.encode('base64pad', value).slice(1));
+}
+
+export function decodeBase64(value: string): Uint8Array {
+    // return decodeBase64(value);
+    return multibase.decode('M'+value);
+}
+
+export function encodeHex(value: Uint8Array | ArrayBuffer): string {
+    let view: Uint8Array;
+    if(!ArrayBuffer.isView(value)) {
+        view = new Uint8Array(value);
+    } else {
+        view = value
+    }
+    return Array.from(view).map((b) => b.toString(16).padStart(2, "0")).join("")
+}
+
+export function decodeHex(value: string): Uint8Array {
+    let result = new Uint8Array(value.length/2);
+    for (var i = 0; i < value.length; i += 2) {
+        result.set([parseInt(value.slice(i, i+2), 16)], i/2);
+    }
+    return result;
 }
 
 type MultihashDecodeResult = {

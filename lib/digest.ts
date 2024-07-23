@@ -1,5 +1,5 @@
 import { blake2b, blake2s } from 'hash-wasm';
-import { hashEncode, multihashDecode } from './multiencoding';
+import { decodeHex, hashEncode, multihashDecode } from './multiencoding';
 
 /** Options for digest(). */
 type DigestOpts = {
@@ -33,7 +33,7 @@ export async function digest(value: Uint8Array, opts?: DigestOpts): Promise<stri
  */
 export async function verifyDigest(encodedDigest: string | Uint8Array, content: Uint8Array) : Promise<boolean> {
     if(!ArrayBuffer.isView(content)) {
-        encodedDigest = Buffer.from(encodedDigest);
+        encodedDigest = new Uint8Array(content);
     }
 
     const {name, digest: oldDigest} = multihashDecode(encodedDigest);
@@ -56,10 +56,10 @@ async function digestContent(value: Uint8Array, digestName: string): Promise<Uin
     switch(digestName.toLocaleLowerCase()) {
         case 'blake2s-256':
         case 'blake2s256':
-            return Buffer.from(await blake2s(value), 'hex');
+            return decodeHex(await blake2s(value));
         case 'blake2b-512':
         case 'blake2b512':
-            return Buffer.from(await blake2b(value), 'hex');
+            return decodeHex(await blake2b(value));
         default:
             throw new Error(`Digest ${digestName} is not supported`);
     }

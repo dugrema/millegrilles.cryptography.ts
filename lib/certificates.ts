@@ -1,5 +1,5 @@
 import { BasicConstraintsExtension, X509Certificate, Extension } from "@peculiar/x509";
-import { baseEncode, getMultihashBytes } from './multiencoding'
+import { baseEncode, encodeHex, getMultihashBytes, decodeBase64, encodeBase64 } from './multiencoding'
 import { digest } from "./digest";
 import { AsnConvert, OctetString } from "@peculiar/asn1-schema";
 import { PrivateKeyInfo } from "@peculiar/asn1-asym-key";
@@ -121,7 +121,7 @@ export class CertificateWrapper {
         // Extract the EC public key from this ASN.1 structure
         const publicKeySlice = publicKey.rawData.slice(publicKey.rawData.byteLength-32);
         // Return in hex format
-        return Buffer.from(publicKeySlice).toString('hex');
+        return encodeHex(publicKeySlice);
     }
 
     getMillegrillePublicKey(): string {
@@ -133,7 +133,7 @@ export class CertificateWrapper {
         const publicKeySlice = publicKey.rawData.slice(publicKey.rawData.byteLength-32);
 
         // Return in hex format
-        return Buffer.from(publicKeySlice).toString('hex');
+        return encodeHex(publicKeySlice);
     }
 
     getCommonName(): string {
@@ -229,7 +229,7 @@ export function loadPrivateKeyEd25519(pem: string, password?: string): Uint8Arra
     if(password) throw new Error('not implemented');
 
     let keyString = pem.replace(KEY_BEGIN, '').replace(KEY_END, '').replace(/\\r\\n/g, '');
-    let keyBytes = Buffer.from(keyString, 'base64');
+    let keyBytes = decodeBase64(keyString.trim());
     let ecParams = AsnConvert.parse(keyBytes, PrivateKeyInfo);
     let privateKey = ecParams.privateKey.slice(ecParams.privateKey.byteLength-32);
     return new Uint8Array(privateKey)
@@ -256,7 +256,7 @@ export function savePrivateKeyEd25519(key: Uint8Array, password?: string): strin
         privateKeyAlgorithm: algorithm,
         privateKey: new PrivateKeyPkcs8(AsnConvert.serialize(curvePrivateKey)),
     });
-    let keyBase64 = Buffer.from(AsnConvert.serialize(pkcs8)).toString("base64");
+    let keyBase64 = encodeBase64(new Uint8Array(AsnConvert.serialize(pkcs8)));
     
     let pemList = [KEY_BEGIN, keyBase64, KEY_END];
     return pemList.join('\n');
@@ -364,7 +364,7 @@ export class CertificateStore {
             let certPublickey = chain[0].publicKey;
             if(certPublickey.algorithm.name !== 'Ed25519') throw new Error("Unsupported algorithm");
             let publicKeySlice = certPublickey.rawData.slice(certPublickey.rawData.byteLength-32);
-            let publicKeyCert = Buffer.from(publicKeySlice).toString('hex');
+            let publicKeyCert = encodeHex(publicKeySlice);
             if(publicKey !== publicKeyCert) throw new Error('Mismatch between pubkey and attached certificate');
         }
 
