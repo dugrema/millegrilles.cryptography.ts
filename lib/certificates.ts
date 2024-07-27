@@ -361,7 +361,7 @@ export class CertificateStore {
             // We still re-verify the chain to check its validity against the message date.
         } else {
             // Cache miss, extract the certificate and parse.
-            chain = message.certificate.map(item=>new X509Certificate(item));
+            chain = message.certificat.map(item=>new X509Certificate(item));
             // Ensure that the pubkey field and attached certificate match.
             let certPublickey = chain[0].publicKey;
             if(certPublickey.algorithm.name !== 'Ed25519') throw new Error("Unsupported algorithm");
@@ -373,13 +373,13 @@ export class CertificateStore {
         let verifyResult = await verifyCertificate(chain, this.ca, messageDate)
         if(verifyResult && this.cache && !certificateWrapper) {
             // Save to cache - reuse wrapper if possible.
-            let saveResult = await this.cache.saveCertificate(message.certificate);
+            let saveResult = await this.cache.saveCertificate(message.certificat);
             if(typeof(saveResult) !== 'boolean') certificateWrapper = saveResult;
         }
 
         if(!certificateWrapper) {
             // Generate new wrapper for this certificate.
-            certificateWrapper = new CertificateWrapper(message.certificate)
+            certificateWrapper = new CertificateWrapper(message.certificat)
         }
 
         return certificateWrapper

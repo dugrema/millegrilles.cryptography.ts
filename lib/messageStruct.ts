@@ -46,7 +46,7 @@ export class MilleGrillesMessage {
     origine?: string;  // System of origin (IDMG)
     dechiffrage?: MessageDecryption;  // Decryption information.
     signature: string;  // Message signature
-    certificate?: string[];  // PEM certificat chain (excluding the CA/root)
+    certificat?: string[];  // PEM certificat chain (excluding the CA/root)
     millegrille?: string;  // PEM certificate of the system (CA/root)
     attachements?: {}  // Attachments to this message
 
@@ -142,7 +142,7 @@ async function signMessage(message: MilleGrillesMessage, key: MessageSigningKey)
     if(!message.id) throw new Error("Message id is missing");
     let messageId = decodeHex(message.id);
     let signature = await key.sign(messageId);
-    message.certificate = key.certificate.pemChain;
+    message.certificat = key.certificate.pemChain;
     return signature
 }
 
