@@ -45,7 +45,7 @@ export class MilleGrillesMessage {
     pre_migration?: PreMigration;  // Transaction migration information
     origine?: string;  // System of origin (IDMG)
     dechiffrage?: MessageDecryption;  // Decryption information.
-    signature: string;  // Message signature
+    sig: string;  // Message signature
     certificat?: string[];  // PEM certificat chain (excluding the CA/root)
     millegrille?: string;  // PEM certificate of the system (CA/root)
     attachements?: {}  // Attachments to this message
@@ -60,7 +60,7 @@ export class MilleGrillesMessage {
         this.pubkey = signingKey.publicKey;
         verifyForKind(this);
         if(!this.id) this.id = await generateMessageId(this);
-        this.signature = await(signMessage(this, signingKey));
+        this.sig = await(signMessage(this, signingKey));
     }
 
     async verify() {
@@ -149,7 +149,7 @@ async function signMessage(message: MilleGrillesMessage, key: MessageSigningKey)
 async function verifyMessage(message: MilleGrillesMessage): Promise<boolean> {
     if(!message.id) throw new Error("Message id is missing");
     let messageId = decodeHex(message.id);
-    let signatureBytes = decodeHex(message.signature);
+    let signatureBytes = decodeHex(message.sig);
     let pubkey = decodeHex(message.pubkey);
     return await verifyMessageSignature(pubkey, messageId, signatureBytes);
 }
