@@ -1,7 +1,7 @@
 import { pki, ed25519 } from '@dugrema/node-forge';
 import { OIDS } from './certificates';
 
-export async function createCsr(username: string, userId?: string): Promise<{pem: string, privateKey: Uint8Array, publicKey: Uint8Array }> {
+export async function createCsr(username: string, userId?: string): Promise<{pem: string, privateKeyPem: string, privateKey: Uint8Array, publicKey: Uint8Array }> {
 
     // Generate new keypair
     let keypair = ed25519.generateKeyPair();
@@ -31,6 +31,8 @@ export async function createCsr(username: string, userId?: string): Promise<{pem
   
     // Export using PEM format
     let pem = pki.certificationRequestToPem(csr);
+
+    let privateKeyPem = ed25519.privateKeyToPem(keypair.privateKey) as string;
   
-    return {pem, privateKey, publicKey};
+    return {pem, privateKeyPem, privateKey, publicKey};
 }
