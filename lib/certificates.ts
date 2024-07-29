@@ -396,10 +396,6 @@ export async function generateCsr(username: string, userId?: string): Promise<Ge
     // Generate new keypair
     const keys = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
 
-    // Extract private key
-    // const privateKeyJwk = await crypto.subtle.exportKey('jwk', keys.privateKey);
-    // let privateBytes = decodeBase64Url(privateKeyJwk.d);
-
     // Add extensions including userId when provided.
     let extensions: Array<Extension> = [new KeyUsagesExtension(KeyUsageFlags.digitalSignature | KeyUsageFlags.keyEncipherment)];
     if(userId) {

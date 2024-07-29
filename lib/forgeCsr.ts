@@ -5,8 +5,8 @@ export async function createCsr(username: string, userId?: string): Promise<{pem
 
     // Generate new keypair
     let keypair = ed25519.generateKeyPair();
-    let publicKey = new Uint8Array(keypair.publicKey.publicKeyBytes);       // 32 bytes
-    let privateKey = new Uint8Array(keypair.privateKey.privateKeyBytes);    // 64 bytes, includes the public key
+    let publicKey = new Uint8Array(keypair.publicKey.publicKeyBytes);
+    let privateKey = new Uint8Array(keypair.privateKey.privateKeyBytes).slice(0, 32);  // Keep first 32 bytes (private component)
   
     const csr = pki.createCertificationRequest();
     csr.publicKey = keypair.publicKey;
