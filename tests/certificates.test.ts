@@ -1,6 +1,7 @@
-import * as x509 from "@peculiar/x509";
+// import * as x509 from "@peculiar/x509";
 // import { Crypto } from "@peculiar/webcrypto";
-import { verifyCertificatePem, wrapperFromPems, getIdmg, loadPrivateKeyEd25519, savePrivateKeyEd25519, CertificateStore, CertificateCache, generateCsr } from "../lib/certificates"
+import { verifyCertificatePem, wrapperFromPems, getIdmg, loadPrivateKeyEd25519, savePrivateKeyEd25519, CertificateStore, CertificateCache, generateCsr } from "../lib/certificates";
+import { decodeBase64Url } from "../lib/multiencoding";
 import { parseMessage } from "../lib/messageStruct";
 
 // Wire crytpo to work on node as in the browser
@@ -172,6 +173,11 @@ test('test store message', async ()=>{
 test('test generate CSR', async ()=>{
     let csrResult = await generateCsr('testUser', 'zABCD1234');
     // console.debug("CSR\n%s", csrResult.csr);
-    expect(csrResult.csr).toBeDefined();
-    expect(csrResult.privateKey).toBeDefined();
+    expect(typeof(csrResult.csr)).toBe('string');
+    expect(csrResult.keys).toBeDefined();
+
+    // Extract private key
+    let privateKeyJwk = await crypto.subtle.exportKey('jwk', csrResult.keys.privateKey);
+    let privateBytes = decodeBase64Url(privateKeyJwk.d);
+    expect(privateBytes).toBeDefined();
 })

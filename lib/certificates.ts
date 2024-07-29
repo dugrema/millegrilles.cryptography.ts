@@ -1,5 +1,5 @@
 import { BasicConstraintsExtension, X509Certificate, Extension, Pkcs10CertificateRequestGenerator, KeyUsagesExtension, KeyUsageFlags } from "@peculiar/x509";
-import { baseEncode, encodeHex, getMultihashBytes, decodeBase64, encodeBase64, decodeBase64Url } from './multiencoding'
+import { baseEncode, encodeHex, getMultihashBytes, decodeBase64, encodeBase64 } from './multiencoding'
 import { digest } from "./digest";
 import { AsnConvert, OctetString } from "@peculiar/asn1-schema";
 import { PrivateKeyInfo } from "@peculiar/asn1-asym-key";
@@ -387,9 +387,9 @@ export class CertificateStore {
     }
 }
 
-type GenerateCsrResult = {
+export type GenerateCsrResult = {
     csr: string,
-    privateKey: Uint8Array,
+    keys: CryptoKeyPair,
 };
 
 export async function generateCsr(username: string, userId?: string): Promise<GenerateCsrResult> {
@@ -397,8 +397,8 @@ export async function generateCsr(username: string, userId?: string): Promise<Ge
     const keys = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
 
     // Extract private key
-    const privateKeyJwk = await crypto.subtle.exportKey('jwk', keys.privateKey);
-    let privateBytes = decodeBase64Url(privateKeyJwk.d);
+    // const privateKeyJwk = await crypto.subtle.exportKey('jwk', keys.privateKey);
+    // let privateBytes = decodeBase64Url(privateKeyJwk.d);
 
     // Add extensions including userId when provided.
     let extensions: Array<Extension> = [new KeyUsagesExtension(KeyUsageFlags.digitalSignature | KeyUsageFlags.keyEncipherment)];
@@ -415,5 +415,5 @@ export async function generateCsr(username: string, userId?: string): Promise<Ge
         extensions,
     });
 
-    return {csr: csr.toString(), privateKey: privateBytes};
+    return {csr: csr.toString(), keys};
 }
