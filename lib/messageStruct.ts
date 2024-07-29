@@ -107,7 +107,7 @@ async function generateMessageId(message: MilleGrillesMessage): Promise<string> 
 
     // The digest is done on an array of elements. The array depends on the kind of message.
 
-    let content: any[] = [message.pubkey, message.kind, message.estampille, message.contenu];
+    let content: any[] = [message.pubkey, message.estampille, message.kind, message.contenu];
     if([0,4].includes(kind)) {
         // Nothing to add
     } else if([1,2,3,5].includes(kind)) {
@@ -126,7 +126,7 @@ async function generateMessageId(message: MilleGrillesMessage): Promise<string> 
     }
 
     // Convert to JSON (properly ordered for dict elements)
-    let output: any = stringify(content);
+    let output: any = stringify(content).normalize();
     // Convert to bytes
     output = new TextEncoder().encode(output.normalize());
     

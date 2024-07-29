@@ -52,7 +52,7 @@ test('sign-message 1', async () => {
     let message = new MilleGrillesMessage(1721592075, MessageKind.Document, 'DUMMY CONTENT');
     await message.sign(signingKey);
     expect(message.pubkey).toStrictEqual('4ff87c18844b0575b77946fb84a469b58d931622672b3c2614439bc9b609cdc4');
-    expect(message.id).toStrictEqual('13981c55d168d1ae35e3e6bbe357a1bca1f4187b1e39ebf9b07cce317ca96318');
+    expect(message.id).toStrictEqual('06e7ebf2e0b83338a0eb6779d9cd0cb0c6d9fc68cf34dbe978da61291d746fdc');
     expect(message.certificat).toStrictEqual(CERTIFICATE_1);
     expect(Buffer.from(message.sig).length).toBe(128);
 
@@ -67,7 +67,7 @@ test('sign-command', async () => {
     message.routage = {domaine: 'DUMMY-DOMAINE', action: 'DUMMY-ACTION'}
     await message.sign(signingKey);
     expect(message.pubkey).toStrictEqual('4ff87c18844b0575b77946fb84a469b58d931622672b3c2614439bc9b609cdc4');
-    expect(message.id).toStrictEqual('1b70b5cf9a7dc222aeb430864f930fc0fe448b6190b03b8739bf1387f56d3c72');
+    expect(message.id).toStrictEqual('d3b050d8f15a2c97f7aa3ee4d024a6211e501c89bd3413fa5fa279f16a973d9d');
     expect(message.certificat).toStrictEqual(CERTIFICATE_1);
     expect(Buffer.from(message.sig).length).toBe(128);
 
@@ -86,7 +86,7 @@ test('create routed message', async () => {
     expect(message.contenu).toBe('{"b":true,"n":18,"sub":{"a":"More text","b":12},"value":"DUMMY content"}');
     expect(message.estampille).toBe(1721592075);
     expect(message.kind).toBe(MessageKind.Request);
-    expect(message.id).toBe("950d1ba9ae74fbfd161b2e6c77a4589f0e6576f2ce6d3e39e8b25d84dc2d5aae");
+    expect(message.id).toBe("bf158f1c235dea7fbb4af8cdf8641ae61e9dca8861396a5f879b6d7ed2775ec1");
     expect(message.sig).toBeTruthy();
     expect(message.certificat).toStrictEqual(CERTIFICATE_1);
     expect(await message.getContent()).toStrictEqual(content);
@@ -105,7 +105,7 @@ test('create response', async () => {
     expect(message.contenu).toBe('{"b":true,"n":18,"sub":{"a":"More text","b":12},"value":"DUMMY content"}');
     expect(message.estampille).toBe(1721592075);
     expect(message.kind).toBe(MessageKind.Document);
-    expect(message.id).toBe("1efc7cda1332b036d9b5f7326625ee62f15fb4fbf1c9895c98fdda787fa1dee2");
+    expect(message.id).toBe("32491f643f2c85d86106a81217960a7122b2247406e227e024249b67ea71bed0");
     expect(message.sig).toBeTruthy();
     expect(message.certificat).toStrictEqual(CERTIFICATE_1);
     expect(await message.getContent()).toStrictEqual(content);
@@ -155,4 +155,23 @@ test('serialize-deserialize message', async () => {
 
     // Compare content to confirm round-trip
     expect(await message.getContent()).toStrictEqual(content);
+})
+
+const MESSAGE_FROM_PYTHON = {
+    "pubkey": "4a9cedf45aa5d0269de906a8cb5a692661668eed866de3b89714f61c04aa9c04",
+    "estampille": 1722287727,
+    "kind": 0,
+    "contenu": "{\"texte\":\"Du texte.\",\"valeur\":1}",
+    "id": "a0d8f81e3704b5e0283a674c169c7e19a2f3abd8020562fe8fbb3f65d70bd824",
+    "sig": "65e2c1ce15f9c476af6f0fc8ac2b9bdc022fd6ae97c3d44014461b5c50077cfa2361557a1e592593308d9e2a336f3618e3c52055c4c81f64d7d2c4b7e2449d05",
+    "certificat": [
+      "-----BEGIN CERTIFICATE-----\nMIIClDCCAkagAwIBAgIUXC5AOCMbTbgN7iWKOvw+1hkamokwBQYDK2VwMHIxLTAr\nBgNVBAMTJGEwYmI1ZGJiLTcyZmItNDEzZi05N2ZmLTc5OGQyYWVmMGQ1MDFBMD8G\nA1UEChM4emVZbmNScUVxWjZlVEVtVVo4d2hKRnVIRzc5NmVTdkNUV0U0TTQzMml6\nWHJwMjJiQXR3R203SmYwHhcNMjQwNzE3MTEyOTAwWhcNMjQwODE3MTEyOTIwWjCB\ngTEtMCsGA1UEAwwkYTBiYjVkYmItNzJmYi00MTNmLTk3ZmYtNzk4ZDJhZWYwZDUw\nMQ0wCwYDVQQLDARjb3JlMUEwPwYDVQQKDDh6ZVluY1JxRXFaNmVURW1VWjh3aEpG\ndUhHNzk2ZVN2Q1RXRTRNNDMyaXpYcnAyMmJBdHdHbTdKZjAqMAUGAytlcAMhAEqc\n7fRapdAmnekGqMtaaSZhZo7thm3juJcU9hwEqpwEo4HdMIHaMCsGBCoDBAAEIzQu\nc2VjdXJlLDMucHJvdGVnZSwyLnByaXZlLDEucHVibGljMAwGBCoDBAEEBGNvcmUw\nTAYEKgMEAgREQ29yZUJhY2t1cCxDb3JlQ2F0YWxvZ3VlcyxDb3JlTWFpdHJlRGVz\nQ29tcHRlcyxDb3JlUGtpLENvcmVUb3BvbG9naWUwDwYDVR0RBAgwBoIEY29yZTAf\nBgNVHSMEGDAWgBSzLC+4Fl0LGB3c3MDNPiZxT4BI+DAdBgNVHQ4EFgQUL6rsDhKr\nNXHN8NWdaT65cl5uUjcwBQYDK2VwA0EAGnb5qFGWVnqAeUg8oteXE3m8+oYKuzlI\npjrYag3mY79CtvnWZ1H6h9JLfDRl4j5S2i8D1ywxrbg8wBULD0ucDg==\n-----END CERTIFICATE-----",
+      "-----BEGIN CERTIFICATE-----\r\nMIIBozCCAVWgAwIBAgIKBoEAlpIHYAWTaDAFBgMrZXAwFjEUMBIGA1UEAxMLTWls\r\nbGVHcmlsbGUwHhcNMjQwNzE3MTEyODA4WhcNMjYwMTI2MTEyODA4WjByMS0wKwYD\r\nVQQDEyRhMGJiNWRiYi03MmZiLTQxM2YtOTdmZi03OThkMmFlZjBkNTAxQTA/BgNV\r\nBAoTOHplWW5jUnFFcVo2ZVRFbVVaOHdoSkZ1SEc3OTZlU3ZDVFdFNE00MzJpelhy\r\ncDIyYkF0d0dtN0pmMCowBQYDK2VwAyEAZ/cAJCrI5igFVQNa2YmgL3CPvERXhlyS\r\nWvnGAV+4OVGjYzBhMBIGA1UdEwEB/wQIMAYBAf8CAQAwCwYDVR0PBAQDAgEGMB0G\r\nA1UdDgQWBBSzLC+4Fl0LGB3c3MDNPiZxT4BI+DAfBgNVHSMEGDAWgBTTiP/MFw4D\r\nDwXqQ/J2LLYPRUkkETAFBgMrZXADQQCmqcjq64U/cKDhGpLV4LE2WNRVloXeUK3z\r\ntEjszGAVQ+Kr04y/k3FuCVJ1aoLwaZbmPB2CzV9XyQzub2vc/+AO\n-----END CERTIFICATE-----"
+    ]
+};
+
+test('deserialize message from python', async () => {
+    let deserializedMessage = parseMessage(JSON.stringify(MESSAGE_FROM_PYTHON));
+    let result = await deserializedMessage.verify();
+    expect(result).toBe(true);
 })
