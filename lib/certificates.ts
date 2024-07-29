@@ -364,7 +364,10 @@ export class CertificateStore {
             // We still re-verify the chain to check its validity against the message date.
         } else {
             // Cache miss, extract the certificate and parse.
-            chain = message.certificat.map(item=>new X509Certificate(item));
+            chain = message.certificat.map(item=>{
+                let cleanCert = item.replace(/\r/g, '');
+                return new X509Certificate(cleanCert);
+            });
             // Ensure that the pubkey field and attached certificate match.
             let certPublickey = chain[0].publicKey;
             if(certPublickey.algorithm.name !== 'Ed25519') throw new Error("Unsupported algorithm");
