@@ -169,8 +169,9 @@ test('test store message', async ()=>{
     expect(wrapperVerify2).toBe(wrapperVerify1);  // Checks that we got the same object back with toBe.
 })
 
-test('test store message', async ()=>{
-    let csr = await generateCsr('testUser', 'zABCD1234');
-    console.debug("CSR private key %O\n", csr.privateKey, csr.csr);
-    expect(csr).toBeDefined();
+test('test generate CSR', async ()=>{
+    let csrResult = await generateCsr('testUser', 'zABCD1234');
+    // console.debug("CSR\n%s", csrResult.csr);
+    expect(csrResult.csr).toBeDefined();
+    expect(csrResult.privateKey).toBeDefined();
 })
