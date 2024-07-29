@@ -1,11 +1,12 @@
-import { BasicConstraintsExtension, X509Certificate, Extension } from "@peculiar/x509";
-import { baseEncode, encodeHex, getMultihashBytes, decodeBase64, encodeBase64 } from './multiencoding'
+import { BasicConstraintsExtension, X509Certificate, Extension, Pkcs10CertificateRequestGenerator, KeyUsagesExtension, KeyUsageFlags } from "@peculiar/x509";
+import { baseEncode, encodeHex, getMultihashBytes, decodeBase64, encodeBase64, decodeBase64Url } from './multiencoding'
 import { digest } from "./digest";
 import { AsnConvert, OctetString } from "@peculiar/asn1-schema";
 import { PrivateKeyInfo } from "@peculiar/asn1-asym-key";
 import { AlgorithmIdentifier } from '@peculiar/asn1-x509';
 import { PrivateKey as PrivateKeyPkcs8, PrivateKeyInfo as PrivateKeyInfoPkcs8 } from '@peculiar/asn1-pkcs8';
 import { MilleGrillesMessage } from "./messageStruct";
+
 
 // Custom x509v3 OID extensions for MilleGrille certificates
 const OID_EXCHANGES = "1.2.3.4.0";
@@ -384,4 +385,35 @@ export class CertificateStore {
 
         return certificateWrapper
     }
+}
+
+type GenerateCsrResult = {
+    csr: string,
+    privateKey: Uint8Array,
+};
+
+export async function generateCsr(username: string, userId?: string): Promise<GenerateCsrResult> {
+    // Generate new keypair
+    const keys = await crypto.subtle.generateKey('Ed25519', true, ['sign', 'verify']);
+
+    // Extract private key
+    const privateKeyJwk = await crypto.subtle.exportKey('jwk', keys.privateKey);
+    let privateBytes = decodeBase64Url(privateKeyJwk.d);
+
+    // Add extensions including userId when provided.
+    let extensions: Array<Extension> = [new KeyUsagesExtension(KeyUsageFlags.digitalSignature | KeyUsageFlags.keyEncipherment)];
+    if(userId) {
+        let userIdExtension = new Extension(OID_USERID, false, new TextEncoder().encode(userId));
+        extensions.push(userIdExtension);
+    }
+
+    // Generate new CSR
+    const csr = await Pkcs10CertificateRequestGenerator.create({
+        name: "CN="+username,
+        keys,
+        signingAlgorithm: {name: 'Ed25519'},
+        extensions,
+    });
+
+    return {csr: csr.toString(), privateKey: privateBytes};
 }

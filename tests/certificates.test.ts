@@ -1,11 +1,11 @@
 import * as x509 from "@peculiar/x509";
-import { Crypto } from "@peculiar/webcrypto";
-import { verifyCertificatePem, wrapperFromPems, getIdmg, loadPrivateKeyEd25519, savePrivateKeyEd25519, CertificateStore, CertificateCache } from "../lib/certificates"
+// import { Crypto } from "@peculiar/webcrypto";
+import { verifyCertificatePem, wrapperFromPems, getIdmg, loadPrivateKeyEd25519, savePrivateKeyEd25519, CertificateStore, CertificateCache, generateCsr } from "../lib/certificates"
 import { parseMessage } from "../lib/messageStruct";
 
 // Wire crytpo to work on node as in the browser
-const crypto = new Crypto();
-x509.cryptoProvider.set(crypto);
+// const crypto = new Crypto();
+// x509.cryptoProvider.set(crypto);
 
 const CERTIFICATE_1 = [
     `-----BEGIN CERTIFICATE-----
@@ -167,4 +167,10 @@ test('test store message', async ()=>{
     // Test cache HIT
     let wrapperVerify2 = await store.verifyMessage(message);
     expect(wrapperVerify2).toBe(wrapperVerify1);  // Checks that we got the same object back with toBe.
+})
+
+test('test store message', async ()=>{
+    let csr = await generateCsr('testUser', 'zABCD1234');
+    console.debug("CSR private key %O\n", csr.privateKey, csr.csr);
+    expect(csr).toBeDefined();
 })
