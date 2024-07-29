@@ -95,12 +95,14 @@ export class CertificateWrapper {
     extensions?: MilleGrillesCertificateExtensions;
 
     constructor(pemChain: string[], pemMillegrille?: string) {
-        // Save PEMs for future reference (e.g. when signing)
-        this.pemChain = pemChain;
+        // Save PEMs for future reference (e.g. when signing). Cleanup \r.
+        this.pemChain = pemChain.map(item=>{
+            return item.replace(/\r/g, '')
+        });
         this.pemMillegrille = pemMillegrille;
 
         // Map the PEMs to certificate objects
-        this.chain = pemChain.map(item=>new X509Certificate(item));
+        this.chain = this.pemChain.map(item=>new X509Certificate(item));
         if(pemMillegrille) {
             this.millegrille = new X509Certificate(pemMillegrille);
         }
