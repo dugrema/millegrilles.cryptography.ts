@@ -61,12 +61,15 @@ export function encodeBase64Nopad(value: Uint8Array): string {
 }
 
 export function decodeBase64Nopad(value: string): Uint8Array {
-    // return decodeBase64(value);
     return multibase.decode('m'+value);
 }
 
+export function encodeBase64Url(value: Uint8Array): string {
+    // Return the encoded value without the multibase 'u' flag
+    return String.fromCharCode.apply(null, multibase.encode('base64url', value).slice(1));
+}
+
 export function decodeBase64Url(value: string): Uint8Array {
-    // return decodeBase64(value);
     return multibase.decode('u'+value);
 }
 
@@ -76,7 +79,6 @@ export function encodeBase64(value: Uint8Array): string {
 }
 
 export function decodeBase64(value: string): Uint8Array {
-    // return decodeBase64(value);
     return multibase.decode('M'+value);
 }
 
