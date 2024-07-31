@@ -36,3 +36,22 @@ export async function createCsr(username: string, userId?: string): Promise<{pem
   
     return {pem, privateKeyPem, privateKey, publicKey};
 }
+
+/**
+ * Loads a private key.
+ * @param pem Private key PEM content
+ * @param password Password to decrypt the key (when the private key is encrypted)
+ * @returns Private key bytes (32 bytes)
+ */
+export function loadPrivateKey(pem: string, password?: string): Uint8Array {
+    if(password) {
+        // Dechiffrer la cle privee
+        let wrappedKey = pki.encryptedPrivateKeyFromPem(pem);
+        let asn1Key = pki.decryptPrivateKeyInfo(wrappedKey, password);
+        let privateKey = ed25519.privateKeyFromAsn1(asn1Key);
+        return new Uint8Array(privateKey.privateKeyBytes);
+    } else {
+        let privateKey = ed25519.privateKeyFromPem(pem);
+        return new Uint8Array(privateKey.privateKeyBytes);
+    }
+}
