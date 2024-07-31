@@ -79,6 +79,7 @@ export type MilleGrillesCertificateExtensions = {
     roles?: string[],
     domains?: string[],
     userId?: string,
+    commonName?: string,
     adminGrants?: string[],
     domainGrants?: string[],
 };
@@ -159,9 +160,12 @@ function extractMillegrillesExtensions(certificate: X509Certificate): MilleGrill
     const userId = readExtensionValue(certificate.getExtension(OID_USERID))
     const adminGrants = readExtensionListValue(certificate.getExtension(OID_ADMIN_GRANTS));
     const domainGrants = readExtensionListValue(certificate.getExtension(OID_DOMAIN_GRANTS));
-    
+
+    // Make availble for times when the certificate is transferred as a proxy (comlink).
+    const commonName = certificate.subjectName.getField('CN').pop();
+
     const extensions: MilleGrillesCertificateExtensions = {
-        exchanges, roles, domains, userId, adminGrants, domainGrants
+        exchanges, roles, domains, userId, adminGrants, domainGrants, commonName,
     };
 
     return extensions
