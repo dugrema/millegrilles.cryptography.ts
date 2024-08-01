@@ -55,3 +55,16 @@ export function loadPrivateKey(pem: string, password?: string): Uint8Array {
         return new Uint8Array(privateKey.privateKeyBytes);
     }
 }
+
+/**
+ * Verifies a CSR and returns the username.
+ * @param pem CSR string.
+ * @returns username (CN subject field)
+ */
+export function verifyUserCsr(pem: string): string {
+    const csrForge = pki.certificationRequestFromPem(pem)
+    if(!csrForge.verify()) throw new Error('Invalid CSR');
+    const cn = csrForge.subject.getField('CN').value
+    if(!cn) throw new Error('Username missing from the CSR');
+    return cn
+}
