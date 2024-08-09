@@ -1,4 +1,6 @@
 import stringify from 'json-stable-stringify'
+import pako from 'pako';
+
 import { digest } from './digest';
 import { MessageSigningKey, verifyMessageSignature } from './ed25519';
 import { CertificateWrapper } from './certificates';
@@ -79,8 +81,9 @@ export class MilleGrillesMessage {
         if(!decryptionKey) throw new Error("The message is encrypted. The decryption key must be provided.");
         if(!this.dechiffrage) throw new Error("The message is encrypted but is missing the decryption information.");
 
-        let decryptedContent = await decryptMessageContent(decryptionKey, this.kind, this.dechiffrage, this.contenu);
+        let decryptedContent = await decryptMessageContent(decryptionKey, this.kind, this.dechiffrage, this.contenu, true);
 
+        // Decompress
         return JSON.parse(decryptedContent);
     }
 };
@@ -244,7 +247,7 @@ export async function createEncryptedCommand(
 }
 
 async function decryptMessageContent(
-    decryptionKey: MessageSigningKey, kind: MessageKind, decryption: MessageDecryption, content: string
+    decryptionKey: MessageSigningKey, kind: MessageKind, decryption: MessageDecryption, content: string, compressed?: boolean
 ): Promise<string> {
     let pubId = decryptionKey.publicKey;
     let encryptedKey = decryption.cles[pubId];
@@ -263,6 +266,10 @@ async function decryptMessageContent(
     outputBuffers.push(await decipher.finalize());
     outputBuffers = outputBuffers.filter(item=>item);  // Remove null buffers
     let output = concatBuffers(outputBuffers);
+
+    if(compressed) {
+        output = pako.ungzip(output);
+    }
 
     return new TextDecoder().decode(output);
 }
