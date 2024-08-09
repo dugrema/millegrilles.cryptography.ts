@@ -251,12 +251,13 @@ export async function createEncryptedCommand(
     let secret = await secretFromEd25519(millegrilleKeyBytes);
     let cipher = await getMgs4CipherWithSecret(secret.secret);
 
+
     let idmg = signingKey.certificate.certificate.subjectName.getField('O').pop();
 
     // Convert content to binary
     let contentBytes = new TextEncoder().encode(stringify(content));
     // Compress
-    contentBytes = pako.deflate(contentBytes);
+    contentBytes = pako.gzip(contentBytes);
 
     // Encrypt content, serialize with base64nopad
     let outputBuffers = [];
@@ -274,11 +275,15 @@ export async function createEncryptedCommand(
         cles[publicKey] = encryptedSecret;
     }
 
+    let domainSignature = new DomainSignature([routing.domaine], 1);
+    await domainSignature.sign(secret.secret);
+
     // Populate decryption information
     let decryption: MessageDecryption = {
         cles,
         format: 'mgs4',
         nonce: encodeBase64Nopad(cipher.header),
+        signature: domainSignature,
     }
 
     if(!timestamp) timestamp = new Date();

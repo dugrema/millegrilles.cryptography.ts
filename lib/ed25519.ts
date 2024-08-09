@@ -49,8 +49,8 @@ export async function verifyMessageSignature(publicKey: Uint8Array, digest: stri
     return true;
 }
 
-export async function messageSigningKeyFromBytes(privateKey: Uint8Array, certificate: Array<string>) {
-    let wrapper = new CertificateWrapper(certificate);
+export async function messageSigningKeyFromBytes(privateKey: Uint8Array, certificate: Array<string>, caPem?: string) {
+    let wrapper = new CertificateWrapper(certificate, caPem);
     let keypair = await generateKeypairEd5519(privateKey);
     return new MessageSigningKey(keypair, wrapper);
 }

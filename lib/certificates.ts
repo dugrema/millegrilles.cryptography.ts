@@ -336,9 +336,11 @@ export class CertificateCache {
 
 export class CertificateStore {
     ca: X509Certificate;
+    caPem: string;
     cache: CertificateCache;
 
     constructor(ca: string) {
+        this.caPem = ca;
         this.ca = new X509Certificate(ca);
     }
 
