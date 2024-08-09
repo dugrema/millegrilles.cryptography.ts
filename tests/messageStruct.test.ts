@@ -1,7 +1,7 @@
 import stringify from 'json-stable-stringify';
 import { loadPrivateKeyEd25519, wrapperFromPems } from '../lib/certificates';
 import { newMessageSigningKey } from '../lib/ed25519';
-import { MessageKind, createRoutedMessage, MilleGrillesMessage, Routage, createResponse, createEncryptedResponse, parseMessage } from '../lib/messageStruct'
+import { MessageKind, createRoutedMessage, MilleGrillesMessage, Routage, createResponse, createEncryptedResponse, createEncryptedCommand, parseMessage } from '../lib/messageStruct'
 
 const PRIVATE_KEY = new Uint8Array(Buffer.from('0123456789012345678901234567890123456789012345678901234567890123', 'hex'));
 const CERTIFICATE_1 = [
@@ -137,6 +137,32 @@ test('create encrypted response', async () => {
     expect(cleartextContent).toStrictEqual(content);
 });
 
+test('create encrypted command', async () => {
+    let certificateWrapper = wrapperFromPems(CERTIFICATE_1, MILLEGRILLE_CERT)
+    let signingKey = await newMessageSigningKey(PRIVATE_KEY, certificateWrapper);
+    let content = {value: "DUMMY content", n: 18, b: true, sub: {b: 12, a: "More text"}};
+    let routing: Routage = {domaine: "DUMMY domaine", action: "DUMMY ACTION"};
+    let encryptionKeys = [signingKey.certificate]
+    let timestamp = new Date(1721592075000);
+    let message = await createEncryptedCommand(signingKey, encryptionKeys, content, routing, timestamp);
+
+    expect(message.pubkey).toBe("4ff87c18844b0575b77946fb84a469b58d931622672b3c2614439bc9b609cdc4");
+    expect(message.estampille).toBe(1721592075);
+    expect(message.kind).toBe(MessageKind.EncryptedCommand);
+    expect(message.id).toBeTruthy();  // Encrypted content changes every time
+    expect(message.dechiffrage).toBeTruthy();
+    expect(message.sig).toBeTruthy();
+    expect(message.contenu).toBeTruthy();
+    expect(message.certificat).toStrictEqual(CERTIFICATE_1);
+
+    // Decrypt the message
+    let privateKey = loadPrivateKeyEd25519(PRIVATE_KEY_1);
+    let decryptionKey = await newMessageSigningKey(privateKey, certificateWrapper);
+    let cleartextContent = await message.getContent(decryptionKey);
+    
+    // Compare content to confirm round-trip
+    expect(cleartextContent).toStrictEqual(content);
+});
 
 test('serialize-deserialize message', async () => {
     let certificateWrapper = wrapperFromPems(CERTIFICATE_1)

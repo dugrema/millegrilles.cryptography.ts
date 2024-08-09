@@ -207,6 +207,8 @@ export async function createEncryptedResponse(
 
     // Convert content to binary
     let contentBytes = new TextEncoder().encode(stringify(content));
+    // Compress
+    contentBytes = pako.deflate(contentBytes);
 
     // Encrypt content, serialize with base64nopad
     let outputBuffers = [];
@@ -214,6 +216,7 @@ export async function createEncryptedResponse(
     outputBuffers.push(await cipher.finalize());
     outputBuffers = outputBuffers.filter(item=>item)  // Remove null buffers
     let output = concatBuffers(outputBuffers);
+
     let contentString = encodeBase64Nopad(output);
 
     let cles = {};
@@ -243,7 +246,50 @@ export async function createEncryptedResponse(
 export async function createEncryptedCommand(
     signingKey: MessageSigningKey, encryptionKeys: CertificateWrapper[], content: Object, routing: Routage, timestamp?: Date
 ): Promise<MilleGrillesMessage> {
-    throw new Error('not implemented')
+    let millegrilleKeyHex = signingKey.certificate.getMillegrillePublicKey();
+    let millegrilleKeyBytes = decodeHex(millegrilleKeyHex);
+    let secret = await secretFromEd25519(millegrilleKeyBytes);
+    let cipher = await getMgs4CipherWithSecret(secret.secret);
+
+    let idmg = signingKey.certificate.certificate.subjectName.getField('O').pop();
+
+    // Convert content to binary
+    let contentBytes = new TextEncoder().encode(stringify(content));
+    // Compress
+    contentBytes = pako.deflate(contentBytes);
+
+    // Encrypt content, serialize with base64nopad
+    let outputBuffers = [];
+    outputBuffers.push(await cipher.update(contentBytes));
+    outputBuffers.push(await cipher.finalize());
+    outputBuffers = outputBuffers.filter(item=>item)  // Remove null buffers
+    let output = concatBuffers(outputBuffers);
+    let contentString = encodeBase64Nopad(output);
+
+    let cles = {};
+    for(let encryptionKey of encryptionKeys) {
+        let publicKey = encryptionKey.getPublicKey();
+        let publicKeyBytes = decodeHex(publicKey);
+        let encryptedSecret = await encryptEd25519(secret.secret, publicKeyBytes);
+        cles[publicKey] = encryptedSecret;
+    }
+
+    // Populate decryption information
+    let decryption: MessageDecryption = {
+        cles,
+        format: 'mgs4',
+        nonce: encodeBase64Nopad(cipher.header),
+    }
+
+    if(!timestamp) timestamp = new Date();
+    let timestampEpoch: number = Math.floor(timestamp.getTime() / 1000);
+    let message = new MilleGrillesMessage(timestampEpoch, MessageKind.EncryptedCommand, contentString);
+    message.routage = routing;
+    message.dechiffrage = decryption;
+    message.origine = idmg;
+    await message.sign(signingKey);
+
+    return message;
 }
 
 async function decryptMessageContent(
