@@ -193,7 +193,8 @@ export function wrapperFromPems(pems: string[], ca?: string): CertificateWrapper
  */
 export async function getIdmg(ca: X509Certificate | string) {
     if(typeof(ca) === 'string') {
-        ca = new X509Certificate(ca);
+        let cleanCert = ca.replace(/\r/g, '');
+        ca = new X509Certificate(cleanCert);
     }
 
     // Get the public key digest using blake2s-256
@@ -340,8 +341,9 @@ export class CertificateStore {
     cache: CertificateCache;
 
     constructor(ca: string) {
-        this.caPem = ca;
-        this.ca = new X509Certificate(ca);
+        let cleanCert = ca.replace(/\r/g, '');
+        this.caPem = cleanCert;
+        this.ca = new X509Certificate(cleanCert);
     }
 
     async verifyCertificate(pems: string[], date?: Date): Promise<boolean> {
