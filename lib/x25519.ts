@@ -133,3 +133,10 @@ export async function generateX25519KeyPair(): Promise<KeyPair> {
     const sodium = _sodium;
     return sodium.crypto_kx_keypair();
 }
+
+export async function sharedSecretFromX22519(privateX25519: Uint8Array, peerPublicX25519: Uint8Array): Promise<Uint8Array> {
+    await _sodium.ready;
+    const sodium = _sodium;
+    return sodium.crypto_scalarmult(privateX25519, peerPublicX25519);
+    // return await digest(sharedSecretKey, {digestName: 'blake2s-256', encoding: 'bytes'}) as Uint8Array;
+}
