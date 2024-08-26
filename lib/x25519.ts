@@ -2,7 +2,7 @@ import { digest } from './digest';
 import { encodeBase64Nopad, decodeBase64Nopad } from './multiencoding';
 import { encryptChacha20Poly1305, decryptChacha20Poly1305 } from './encryption'
 import { generateKeypairEd5519 } from './ed25519';
-import _sodium from 'libsodium-wrappers';
+import _sodium, { KeyPair } from 'libsodium-wrappers';
 
 type SecretFromEd25519Result = {
     secret: Uint8Array,     // Secret value to use
@@ -126,4 +126,10 @@ export async function decryptEd25519(key: string, privateKey: Uint8Array): Promi
     const cleartext = await decryptChacha20Poly1305(ciphertextTag, nonce, sharedSecret);
 
     return cleartext;
+}
+
+export async function generateX25519KeyPair(): Promise<KeyPair> {
+    await _sodium.ready;
+    const sodium = _sodium;
+    return sodium.crypto_kx_keypair();
 }

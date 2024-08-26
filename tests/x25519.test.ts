@@ -1,4 +1,4 @@
-import { secretFromEd25519, secretFromEd25519PrivateX25519Peer, encryptEd25519, decryptEd25519 } from '../lib/x25519';
+import { secretFromEd25519, secretFromEd25519PrivateX25519Peer, encryptEd25519, decryptEd25519, generateX25519KeyPair } from '../lib/x25519';
 import { decodeBase64Nopad } from '../lib/multiencoding'
 import _sodium from 'libsodium-wrappers';
 
@@ -31,4 +31,11 @@ test('encrypt-decrypt Key', async () => {
 
     const cleartext = await decryptEd25519(val, CA_PRIVATE_KEY);
     expect(cleartext).toStrictEqual(SECRET_KEY);
+});
+
+test('encrypt-decrypt Key', async () => {
+    let keypair = await generateX25519KeyPair();
+    expect(keypair.privateKey).toBeDefined();
+    expect(keypair.publicKey).toBeDefined();
+    expect(keypair.keyType).toBe('x25519');
 });
