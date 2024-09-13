@@ -3,13 +3,14 @@ import stringify from "json-stable-stringify";
 import { generateKeypairEd5519, signMessage, verifyMessageSignature } from "./ed25519";
 import { digest } from "./digest";
 import { baseDecode } from "./multiencoding";
+import { multiencoding } from '.';
 
 const CURRENT_VERSION = 1;
 
 export class DomainSignature {
     domaines: string[];
     version: number;
-    signature: string;  // Bse64 no padding encoding of the signed domain.
+    signature: string;  // Base64 no padding encoding of the signed domain.
     ca?: string;
 
     constructor(domaines: string[], version?: number, ca?: string) {
@@ -28,6 +29,19 @@ export class DomainSignature {
 
     async verify(secretKey: Uint8Array): Promise<boolean> {
         return await verifyDomains(secretKey, this.domaines, this.signature);
+    }
+
+    /**
+     * Reusable unique value to identify this key.
+     * @returns {string} Blake2s digest of the signature as a base58btc string.
+     */
+    async getKeyId(): Promise<string> {
+        if(!this.signature) throw new Error("Missing signature")
+        let signatureBytes = multiencoding.decodeBase64Nopad(this.signature);
+        let shortDigestBytes = await digest(signatureBytes, {encoding: 'bytes', digestName: 'blake2s-256'}) as Uint8Array;
+        let shortDigestString =  multiencoding.encodeBase58btc(shortDigestBytes);
+        // Retain the 'z' multibase marker
+        return 'z' + shortDigestString;
     }
 }
 

@@ -82,6 +82,15 @@ export function decodeBase64(value: string): Uint8Array {
     return multibase.decode('M'+value);
 }
 
+export function encodeBase58btc(value: Uint8Array): string {
+    // Return the encoded value without the multibase 'z' flag
+    return String.fromCharCode.apply(null, multibase.encode('base58btc', value).slice(1));
+}
+
+export function decodeBase58btc(value: string): Uint8Array {
+    return multibase.decode('z'+value);
+}
+
 export function encodeHex(value: Uint8Array | ArrayBuffer): string {
     let view: Uint8Array;
     if(!ArrayBuffer.isView(value)) {
