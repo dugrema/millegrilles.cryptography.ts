@@ -1,4 +1,5 @@
 import _sodium from 'libsodium-wrappers';
+import { MessageDecryption } from './messageStruct';
 
 /**
  * Encrypt content using Chacha20Poly1305.
@@ -38,3 +39,8 @@ export function concatBuffers(arrays: Uint8Array[]) {
     }
     return buffer;
 }
+
+/** Structure with information to decrypt an inline ciphertext in base64 (with padding) encoded format. */
+export type EncryptedData = MessageDecryption & {
+    ciphertext_base64: string
+};

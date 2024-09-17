@@ -34,6 +34,7 @@ export type MessageDecryption = {
     header?: string,
     nonce?: string,
     signature?: DomainSignature,
+    compression?: string,
     verification?: string,
 };
 
