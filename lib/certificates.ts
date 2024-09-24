@@ -98,14 +98,16 @@ export class CertificateWrapper {
     constructor(pemChain: string[], pemMillegrille?: string) {
         // Save PEMs for future reference (e.g. when signing). Cleanup \r.
         this.pemChain = pemChain.map(item=>{
-            return item.replace(/\r/g, '')
+            return item.replace(/\r/g, '');
         });
-        this.pemMillegrille = pemMillegrille;
+        if(pemMillegrille) {
+            this.pemMillegrille = pemMillegrille.replace(/\r/g, '');
+        }
 
         // Map the PEMs to certificate objects
         this.chain = this.pemChain.map(item=>new X509Certificate(item));
-        if(pemMillegrille) {
-            this.millegrille = new X509Certificate(pemMillegrille);
+        if(this.pemMillegrille) {
+            this.millegrille = new X509Certificate(this.pemMillegrille);
         }
 
         // Point to main certificate for easier reference
@@ -113,7 +115,7 @@ export class CertificateWrapper {
     }
 
     populateExtensions() {
-        this.extensions = extractMillegrillesExtensions(this.certificate)
+        this.extensions = extractMillegrillesExtensions(this.certificate);
     }
 
     async verify(ca?: X509Certificate, date?: Date | false): Promise<boolean> {
