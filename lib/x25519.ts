@@ -111,8 +111,11 @@ export async function encryptEd25519(secretKey: Uint8Array, publicKey: Uint8Arra
     return encryptedKey;
 }
 
-export async function decryptEd25519(key: string, privateKey: Uint8Array): Promise<Uint8Array> {
-    const keyBytes = decodeBase64Nopad(key);
+export async function decryptEd25519(key: string | Uint8Array, privateKey: Uint8Array): Promise<Uint8Array> {
+    let keyBytes = key;
+    if(typeof(keyBytes) === 'string') {
+        keyBytes = decodeBase64Nopad(keyBytes);
+    }
 
     // Get shared secret to decrypt key
     const publicPeer = keyBytes.slice(0, 32);

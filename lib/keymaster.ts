@@ -4,6 +4,7 @@ import { generateKeypairEd5519, signMessage, verifyMessageSignature } from "./ed
 import { digest } from "./digest";
 import { baseDecode } from "./multiencoding";
 import { multiencoding } from '.';
+import { decryptEd25519, secretFromEd25519PrivateX25519Peer } from './x25519';
 
 const CURRENT_VERSION = 1;
 
@@ -74,4 +75,53 @@ async function verifyDomains(secretKey: Uint8Array, domains: string[], signature
     let signatureBytes = baseDecode('m'+signature);
 
     return await verifyMessageSignature(key.public, digestBytes, signatureBytes);
+}
+
+export async function decryptKey(encryptedKey: string | Uint8Array, privateKey: Uint8Array) {
+    let encryptedKeyBytes = encryptedKey;
+    if(typeof(encryptedKeyBytes) === 'string') {
+        encryptedKeyBytes = multiencoding.decodeBase64Nopad(encryptedKeyBytes);
+    }
+    if(encryptedKeyBytes.length === 32) {
+        // Decrypt directly
+        return await secretFromEd25519PrivateX25519Peer(privateKey, encryptedKeyBytes)
+    } else if(encryptedKeyBytes.length === 80) {
+        // Indirect decryption
+        return await decryptEd25519(encryptedKeyBytes, privateKey)
+    }
+}
+
+export type EncryptionResult = {
+    format: string, 
+    nonce: Uint8Array, 
+    ciphertext: Uint8Array, 
+    digest?: Uint8Array,
+    cle?: {cles?: {[key: string]: string}, signature: DomainSignature}
+    cle_id?: string,
+    cleSecrete?: Uint8Array,
+    compression?: string,
+};
+
+export type EncryptionBase64Result = {
+    format: string, 
+    nonce: string, 
+    ciphertext_base64: string, 
+    digest?: string,
+    cle?: {cles?: {[key: string]: string}, signature: DomainSignature}
+    cle_id?: string,
+    cleSecrete?: Uint8Array,
+    compression?: string,
+};
+
+export function encryptionResultToBase64(value: EncryptionResult): EncryptionBase64Result {
+    return {
+        format: value.format,
+        nonce: value.nonce?multiencoding.encodeBase64(value.nonce):null,
+        ciphertext_base64: multiencoding.encodeBase64(value.ciphertext),
+        digest: value.digest?multiencoding.encodeBase64(value.digest):null,
+        cle: value.cle,
+        cle_id: value.cle_id,
+        cleSecrete: value.cleSecrete,
+        compression: value.compression,
+    };
 }
