@@ -1,5 +1,9 @@
 import { pki, ed25519 } from '@dugrema/node-forge';
 import { getRandom } from './random';
+import { getIdmg } from './certificates';
+
+const CONST_EPOCH_DAY_MS = 24 * 60 * 60 * 1000;                     // Day in ms : 24h * 60min * 60secs * 1000ms
+const CONST_SIGNING_CERT_DURATION = 18 * 31 * CONST_EPOCH_DAY_MS;   // 18 months
 
 export function loadEd25519PrivateKey(pem: string, opts: {password?: string, pemout?: boolean}) {
     opts = opts || {}
@@ -93,4 +97,62 @@ function generateRandomSerialNumber() {
         serial = '0' + serial
     }
     return serial
+}
+
+export async function generateIntermediateCertificate(csrPem: string, caPem: string, privateKeyBytes: Uint8Array) {
+    // Lire et verifier signature du CSR
+    let csr = pki.certificationRequestFromPem(csrPem);
+    if(!csr.verify()) throw new Error("Invalid CSR signature");
+
+    let idmg = await getIdmg(caPem);
+    let certificatRacine = pki.certificateFromPem(caPem);
+    let keyPair = ed25519.generateKeyPair({seed: privateKeyBytes});
+    let privateKey = keyPair.privateKey;
+
+    let cert = pki.createCertificate();
+    cert.publicKey = csr.publicKey;
+    let commonName = csr.subject.getField('CN').value;
+
+    cert.serialNumber = generateRandomSerialNumber();
+    cert.validity.notBefore = new Date();
+    let expiration = cert.validity.notBefore.getTime() + CONST_SIGNING_CERT_DURATION;
+    cert.validity.notAfter = new Date(expiration);
+
+    let akid = certificatRacine.generateSubjectKeyIdentifier().getBytes();
+
+    let attrs = [
+        {name: 'commonName', value: commonName},
+        {name: 'organizationName', value: idmg}
+    ];
+    cert.setSubject(attrs);
+
+    cert.setIssuer(certificatRacine.subject.attributes);
+
+    cert.setExtensions([
+        {
+            name: 'basicConstraints',
+            critical: true,
+            cA: true,
+            pathLenConstraint: 0,
+        }, {
+            name: 'keyUsage',
+            keyCertSign: true,
+            cRLSign: true,
+        },
+        {
+            name: 'subjectKeyIdentifier',
+        }, 
+        {
+            name: 'authorityKeyIdentifier',
+            keyIdentifier: akid,
+        }
+    ]);
+
+    // Sign certificate
+    cert.sign(privateKey);
+
+    // Export as PEM
+    let pem = pki.certificateToPem(cert).replaceAll(/\r/g, '');
+
+    return pem;
 }
