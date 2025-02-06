@@ -1,5 +1,9 @@
-import { blake2b, blake2s } from 'hash-wasm';
+import { blake2b, blake2s, createBLAKE2b, createBLAKE2s } from 'hash-wasm';
 import { decodeHex, hashEncode, multihashDecode } from './multiencoding';
+import { IHasher } from 'hash-wasm/dist/lib/WASMInterface';
+import { multiencoding } from '.';
+import { Base, BaseName } from 'multibase';
+import { HashName } from 'multihashes';
 
 /** Options for digest(). */
 type DigestOpts = {
@@ -63,6 +67,51 @@ async function digestContent(value: Uint8Array, digestName: string): Promise<Uin
         default:
             throw new Error(`Digest ${digestName} is not supported`);
     }
+}
+
+export class WrappedHasher {
+    baseName: BaseName
+    digestName: HashName
+    hasher: IHasher | null
+    digest: string | null
+
+    constructor(baseName: BaseName, digestName: HashName) {
+        this.baseName = baseName;
+        this.digestName = digestName;
+    }
+
+    async init() {
+        this.hasher = await createHasher(this.digestName);
+    }
+
+    update(chunk: Uint8Array) {
+        if(!this.hasher) throw new Error('Hasher not initialized (run obj.init())');
+        this.hasher.update(chunk);
+    }
+
+    finalize(): string {
+        let digest = this.hasher.digest('binary');
+        this.digest = multiencoding.hashEncode(this.baseName, this.digestName, digest);
+        return this.digest;
+    }
+}
+
+export async function createHasher(digestName: string): Promise<IHasher> {
+    let hasher: IHasher;
+    switch(digestName.toLocaleLowerCase()) {
+        case 'blake2s-256':
+        case 'blake2s256':
+            hasher = await createBLAKE2s();
+            break;
+        case 'blake2b-512':
+        case 'blake2b512':
+            hasher = await createBLAKE2b();
+            break;
+        default:
+            throw new Error(`Digest ${digestName} is not supported`);
+    }
+    hasher.init();
+    return hasher;
 }
 
 /**
