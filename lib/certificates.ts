@@ -1,3 +1,4 @@
+import { install as solanaInstall } from '@solana/webcrypto-ed25519-polyfill';
 import { BasicConstraintsExtension, X509Certificate, Extension, Pkcs10CertificateRequestGenerator, KeyUsagesExtension, KeyUsageFlags } from "@peculiar/x509";
 import { baseEncode, encodeHex, getMultihashBytes, decodeBase64, encodeBase64 } from './multiencoding'
 import { digest } from "./digest";
@@ -7,6 +8,8 @@ import { AlgorithmIdentifier } from '@peculiar/asn1-x509';
 import { PrivateKey as PrivateKeyPkcs8, PrivateKeyInfo as PrivateKeyInfoPkcs8 } from '@peculiar/asn1-pkcs8';
 import { MilleGrillesMessage } from "./messageStruct";
 
+// Polyfill for subtle Ed25519 algorithm. Required by @peculiar/x509 on all but Firefox
+solanaInstall();
 
 // Custom x509v3 OID extensions for MilleGrille certificates
 const OID_EXCHANGES = "1.2.3.4.0";

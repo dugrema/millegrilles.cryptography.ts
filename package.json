@@ -47,6 +47,7 @@
     "@peculiar/asn1-x509": "2.3.8",
     "@peculiar/webcrypto": "1.5.0",
     "@peculiar/x509": "1.11.0",
+    "@solana/webcrypto-ed25519-polyfill": "^2.1.0",
     "@types/ed2curve": "0.2.4",
     "bs58": "6.0.0",
     "hash-wasm": "4.11.0",
