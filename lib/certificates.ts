@@ -1,15 +1,13 @@
-import { install as solanaInstall } from '@solana/webcrypto-ed25519-polyfill';
-import { BasicConstraintsExtension, X509Certificate, Extension, Pkcs10CertificateRequestGenerator, KeyUsagesExtension, KeyUsageFlags } from "@peculiar/x509";
+import { BasicConstraintsExtension, X509Certificate, Extension, Pkcs10CertificateRequestGenerator, KeyUsagesExtension, KeyUsageFlags, X509CertificateVerifyParams, PublicKey } from "@peculiar/x509";
 import { baseEncode, encodeHex, getMultihashBytes, decodeBase64, encodeBase64 } from './multiencoding'
 import { digest } from "./digest";
 import { AsnConvert, OctetString } from "@peculiar/asn1-schema";
 import { PrivateKeyInfo } from "@peculiar/asn1-asym-key";
-import { AlgorithmIdentifier } from '@peculiar/asn1-x509';
+import { AlgorithmIdentifier, Certificate } from '@peculiar/asn1-x509';
 import { PrivateKey as PrivateKeyPkcs8, PrivateKeyInfo as PrivateKeyInfoPkcs8 } from '@peculiar/asn1-pkcs8';
 import { MilleGrillesMessage } from "./messageStruct";
+import { verifyMessageSignature } from "./ed25519";
 
-// Polyfill for subtle Ed25519 algorithm. Required by @peculiar/x509 on all but Firefox
-solanaInstall();
 
 // Custom x509v3 OID extensions for MilleGrille certificates
 const OID_EXCHANGES = "1.2.3.4.0";
@@ -58,7 +56,7 @@ export async function verifyCertificate(chain: X509Certificate[], ca: X509Certif
     let parentKey = ca.publicKey;  // Initialise verification with the CA key (self-signed, checks itself)
     for(let cert of certs) {
         if(!parentKey) throw new Error("Invalid chain, at least one signing certificate does not have the CA flag");
-        let result = await cert.verify({date: validationDate, publicKey: parentKey, signatureOnly: false});
+        const result = await verifyCertficateKeys(cert, parentKey, {date: validationDate, signatureOnly: false})
         if(!result) {
             // console.warn("invalid certificate (result:%O), %O (parentKey: %O)", result, cert, parentKey);
             throw new Error("Invalid certificate");
@@ -75,6 +73,66 @@ export async function verifyCertificate(chain: X509Certificate[], ca: X509Certif
     }
 
     return true
+}
+
+// Toggled when Ed25519 is not supported by Subtle.
+let subtleModeEd25519 = true;
+
+// From @peculiar/x-509
+/**
+  * Validates a certificate signature. Mostly taken from @peculiar/x-509, added fallback on libsodium if Ed25519 is not available for Subtle.
+  * @param params Verification parameters
+  * @param crypto Crypto provider. Default is from CryptoProvider
+  */
+async function verifyCertficateKeys(cert: X509Certificate, parentKey: PublicKey, params: X509CertificateVerifyParams): Promise<boolean> {
+    if(!parentKey) throw new Error('Missing parentKey key to validate the certificate');
+
+    // Extract information to verify certificate signature
+    const signature = new Uint8Array(cert.signature);
+    const algorithmEd25519 = cert.signatureAlgorithm.name === 'Ed25519';
+    const certTbs = AsnConvert.parse(cert.rawData, Certificate);
+    const tbs = AsnConvert.serialize(certTbs.tbsCertificate);
+    const tbsView = new Uint8Array(tbs);
+
+    // Support a fallback on libsodium if Subtle does not support Ed25519 natively
+    let ok = false;
+    if(!algorithmEd25519 || subtleModeEd25519) {
+        let publicKeyExported: CryptoKey | null;
+        try {
+            publicKeyExported = await parentKey.export();
+        } catch(err) {
+            console.info("Subtle does not support Ed25519, reverting to libsodium");
+            subtleModeEd25519 = false;
+            ok = await verifyCertificateLibsodium(tbsView, signature, parentKey);
+        }
+        if(!algorithmEd25519 || subtleModeEd25519) {
+            ok = await crypto.subtle.verify('Ed25519', publicKeyExported, signature, tbsView);
+        }
+    } else {
+        ok = await verifyCertificateLibsodium(tbsView, signature, parentKey);
+    }
+
+    if (params.signatureOnly) {
+      return ok;
+    } else {
+      const date = params.date || new Date();
+      const time = date.getTime();
+      return ok && cert.notBefore.getTime() < time && time < cert.notAfter.getTime();
+    }
+}
+
+/**
+ * Check the certificate signature
+ * @param tbs 
+ * @param signature 
+ * @param parentKey 
+ * @returns 
+ */
+async function verifyCertificateLibsodium(tbs: Uint8Array, signature: Uint8Array, parentKey: PublicKey) {
+    // Rip-out the ASN formatting on the Ed25519 public key.
+    const rawKey = new Uint8Array(parentKey.rawData.slice(parentKey.rawData.byteLength-32));
+    // Verify with libsodium
+    return await verifyMessageSignature(rawKey, tbs, signature)
 }
 
 export type MilleGrillesCertificateExtensions = {
