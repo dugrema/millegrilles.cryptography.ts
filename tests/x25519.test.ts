@@ -44,8 +44,8 @@ test('X25519 shared key', async () => {
     let keypair1 = await generateX25519KeyPair();
     let keypair2 = await generateX25519KeyPair();
     
-    let shared1 = sharedSecretFromX22519(keypair1.privateKey, keypair2.publicKey);
-    let shared2 = sharedSecretFromX22519(keypair2.privateKey, keypair1.publicKey);
+    let shared1 = await sharedSecretFromX22519(keypair1.privateKey, keypair2.publicKey);
+    let shared2 = await sharedSecretFromX22519(keypair2.privateKey, keypair1.publicKey);
     
     expect(shared1).toEqual(shared2);
 });
