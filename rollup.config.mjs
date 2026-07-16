@@ -25,7 +25,7 @@ const main = {
       clean: true,
       tsconfigOverride: {
         compilerOptions: {
-          module: "ES2015",
+          module: "es2022",
         },
         exclude: [
           "test",
@@ -63,7 +63,7 @@ const browser = [
         clean: true,
         tsconfigOverride: {
           compilerOptions: {
-            module: "es2015",
+            module: "es2022",
           },
           exclude: [
             "test",
