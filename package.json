@@ -21,6 +21,7 @@
     "@babel/preset-env": "^7.21.4-esm.4",
     "@types/jest": "30.0.0",
     "@types/json-stable-stringify": "1.2.0",
+    "@types/libsodium-wrappers": "^0.7.14",
     "@typescript-eslint/eslint-plugin": "^8.64.0",
     "@typescript-eslint/parser": "^8.64.0",
     "baseline-browser-mapping": "^2.10.43",

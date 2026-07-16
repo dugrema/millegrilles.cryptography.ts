@@ -63,11 +63,11 @@ export async function verifyCertificate(
   date?: Date | false,
 ): Promise<boolean> {
   // Ensure CA certificate has the CA extension flag.
-  const caExtensions: BasicConstraintsExtension = ca.getExtension("2.5.29.19");
-  if (caExtensions.ca !== true) throw new Error("Invalid CA certificate");
+  const caExtensions = ca.getExtension("2.5.29.19") as BasicConstraintsExtension;
+  if (caExtensions && caExtensions.ca !== true) throw new Error("Invalid CA certificate");
 
   // Determine the validation date (if any)
-  let validationDate = null; // Date is false, no check is done on the certificate dates
+  let validationDate: Date | undefined = undefined; // Date is false, no check is done on the certificate dates
   if (date) {
     validationDate = date;
   } else if (date === false) {
@@ -87,7 +87,7 @@ export async function verifyCertificate(
   // Reverse to verify the certificate chain in order (CA/intermediary first).
   certs.reverse();
 
-  let parentKey = ca.publicKey; // Initialise verification with the CA key (self-signed, checks itself)
+  let parentKey: PublicKey | undefined = ca.publicKey; // Initialise verification with the CA key (self-signed, checks itself)
   for (let cert of certs) {
     if (!parentKey)
       throw new Error(
@@ -102,14 +102,13 @@ export async function verifyCertificate(
       throw new Error("Invalid certificate");
     }
 
-    const basicExtensions: BasicConstraintsExtension =
-      ca.getExtension("2.5.29.19");
+    const basicExtensions = ca.getExtension("2.5.29.19") as BasicConstraintsExtension;
     if (basicExtensions && basicExtensions.ca === true) {
       // This is a CA cert (root, intermediary). Use current publicKey to check next certificate.
       parentKey = cert.publicKey;
     } else {
       // This is a leaf certificate. Ensure no other certificates are present by crashing if any.
-      parentKey = null;
+      parentKey = undefined;
     }
   }
 
@@ -143,7 +142,7 @@ async function verifyCertficateKeys(
   // Support a fallback on libsodium if Subtle does not support Ed25519 natively
   let ok = false;
   if (!algorithmEd25519 || subtleModeEd25519) {
-    let publicKeyExported: CryptoKey | null;
+    let publicKeyExported: CryptoKey | undefined;
     try {
       publicKeyExported = await parentKey.export();
     } catch (err) {
@@ -152,12 +151,16 @@ async function verifyCertficateKeys(
       ok = await verifyCertificateLibsodium(tbsView, signature, parentKey);
     }
     if (!algorithmEd25519 || subtleModeEd25519) {
-      ok = await crypto.subtle.verify(
-        "Ed25519",
-        publicKeyExported,
-        signature,
-        tbsView,
-      );
+      if (publicKeyExported) {
+        ok = await crypto.subtle.verify(
+          "Ed25519",
+          publicKeyExported,
+          signature,
+          tbsView,
+        );
+      } else {
+        ok = await verifyCertificateLibsodium(tbsView, signature, parentKey);
+      }
     }
   } else {
     ok = await verifyCertificateLibsodium(tbsView, signature, parentKey);
@@ -239,9 +242,10 @@ export class CertificateWrapper {
   }
 
   async verify(ca?: X509Certificate, date?: Date | false): Promise<boolean> {
-    if (!ca && !this.millegrille)
+    const certificate = ca || this.millegrille;
+    if (!certificate)
       throw new Error("The CA certificate must be provided");
-    return await verifyCertificate(this.chain, ca || this.millegrille, date);
+    return await verifyCertificate(this.chain, certificate, date);
   }
 
   getPublicKey(): string {
@@ -273,8 +277,9 @@ export class CertificateWrapper {
   }
 
   getCommonName(): string {
-    let subject = this.certificate.subjectName;
-    return subject.getField("CN").pop();
+    const subject = this.certificate.subjectName;
+    const cnField = subject.getField("CN").pop();
+    return cnField ?? "";
   }
 }
 
@@ -315,14 +320,14 @@ function extractMillegrillesExtensions(
   return extensions;
 }
 
-function readExtensionListValue(extension: Extension) {
-  if (!extension) return null;
+function readExtensionListValue(extension: Extension | null) {
+  if (!extension) return undefined;
   const decodedValue = new TextDecoder().decode(extension.value);
   return decodedValue.split(",");
 }
 
-function readExtensionValue(extension: Extension) {
-  if (!extension) return null;
+function readExtensionValue(extension: Extension | null) {
+  if (!extension) return undefined;
   return new TextDecoder().decode(extension.value);
 }
 
@@ -445,7 +450,7 @@ export class CertificateCache {
   };
 
   constructor(maxSize?: number) {
-    this.maxSize = maxSize | 20;
+    this.maxSize = maxSize ?? 20;
     this.cacheContent = {};
   }
 
@@ -453,12 +458,13 @@ export class CertificateCache {
    * @returns Certificate if cached
    * @param pubkey Certificate to load from the cache
    */
-  async getCertificate(pubkey: string): Promise<CertificateWrapper> | null {
-    let cacheValue = this.cacheContent[pubkey];
+  async getCertificate(pubkey: string): Promise<CertificateWrapper | undefined> {
+    const cacheValue = this.cacheContent[pubkey];
     if (cacheValue) {
       cacheValue.date = new Date(); // Touch
       return cacheValue.wrapper;
     }
+    return undefined;
   }
 
   /**
@@ -492,11 +498,11 @@ export class CertificateCache {
    * @param expiration Expiration of a cache entry after its last access.
    */
   async maintain(expiration?: number) {
-    expiration = expiration || 300_000; // Default is 5 minutes.
-    let keys = Object.keys(this.cacheContent);
-    let expirationDate = new Date().getTime() - expiration;
-    for (let key of keys) {
-      let value = this.cacheContent[key];
+    const exp = expiration ?? 300_000; // Default is 5 minutes.
+    const keys = Object.keys(this.cacheContent);
+    const expirationDate = new Date().getTime() - exp;
+    for (const key of keys) {
+      const value = this.cacheContent[key];
       if (value.date.getTime() <= expirationDate) {
         delete this.cacheContent[key];
       }
@@ -510,15 +516,16 @@ export class CertificateStore {
   cache: CertificateCache;
 
   constructor(ca: string) {
-    let cleanCert = ca.replace(/\r/g, "");
+    const cleanCert = ca.replace(/\r/g, "");
     this.caPem = cleanCert;
     this.ca = new X509Certificate(cleanCert);
+    this.cache = new CertificateCache();
   }
 
   async verifyCertificate(pems: string[], date?: Date): Promise<boolean> {
-    let chain = pems.map((item) => new X509Certificate(item));
-    let result = await verifyCertificate(chain, this.ca, date);
-    if (result && this.cache) {
+    const chain = pems.map((item) => new X509Certificate(item));
+    const result = await verifyCertificate(chain, this.ca, date);
+    if (result) {
       await this.cache.saveCertificate(pems);
     }
     return result;
@@ -527,48 +534,53 @@ export class CertificateStore {
   async verifyMessage(
     message: MilleGrillesMessage,
   ): Promise<CertificateWrapper> {
-    let timestamp = message.estampille;
-    let messageDate = new Date(timestamp * 1000);
+    const timestamp = message.estampille;
+    const messageDate = new Date(timestamp * 1000);
 
-    let publicKey = message.pubkey;
-    let certificateWrapper: CertificateWrapper;
-    if (this.cache)
-      certificateWrapper = await this.cache.getCertificate(publicKey);
+    const publicKey = message.pubkey;
+    let certificateWrapper: CertificateWrapper | undefined;
     let chain: X509Certificate[];
+
+    if (this.cache)
+      if(publicKey) certificateWrapper = await this.cache.getCertificate(publicKey);
     if (certificateWrapper) {
       // We got a cache hit. Recover the chain.
       chain = certificateWrapper.chain;
-      // No need to check the pubkey.
-      // We got a match from the cache so we know the certificate matches this message (or the
-      // signature check will fail).
-      // We still re-verify the chain to check its validity against the message date.
     } else {
       // Cache miss, extract the certificate and parse.
+      if (!message.certificat) {
+        throw new Error("Message must contain a certificate");
+      }
       chain = message.certificat.map((item) => {
-        let cleanCert = item.replace(/\r/g, "");
+        const cleanCert = item.replace(/\r/g, "");
         return new X509Certificate(cleanCert);
       });
       // Ensure that the pubkey field and attached certificate match.
-      let certPublickey = chain[0].publicKey;
+      const certPublickey = chain[0].publicKey;
       if (certPublickey.algorithm.name !== "Ed25519")
         throw new Error("Unsupported algorithm");
-      let publicKeySlice = certPublickey.rawData.slice(
+      const publicKeySlice = certPublickey.rawData.slice(
         certPublickey.rawData.byteLength - 32,
       );
-      let publicKeyCert = encodeHex(publicKeySlice);
+      const publicKeyCert = encodeHex(publicKeySlice);
       if (publicKey !== publicKeyCert)
         throw new Error("Mismatch between pubkey and attached certificate");
     }
 
-    let verifyResult = await verifyCertificate(chain, this.ca, messageDate);
+    const verifyResult = await verifyCertificate(chain, this.ca, messageDate);
     if (verifyResult && this.cache && !certificateWrapper) {
       // Save to cache - reuse wrapper if possible.
-      let saveResult = await this.cache.saveCertificate(message.certificat);
-      if (typeof saveResult !== "boolean") certificateWrapper = saveResult;
+      if(message.certificat) {
+        const saveResult = await this.cache.saveCertificate(message.certificat);
+        if (typeof saveResult !== "boolean" && saveResult) certificateWrapper = saveResult;
+      }
     }
 
     if (!certificateWrapper) {
       // Generate new wrapper for this certificate.
+      if (!message.certificat) {
+        throw new Error("Message must contain a certificate");
+      }
       certificateWrapper = new CertificateWrapper(message.certificat);
     }
 

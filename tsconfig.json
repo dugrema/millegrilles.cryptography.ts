@@ -2,10 +2,10 @@
     "compilerOptions": {
       "module": "es2022",
       "esModuleInterop": true,
-      "target": "es6",
+      "target": "es2023",
       "moduleResolution": "bundler",
       "sourceMap": true,
       "outDir": "dist"
     },
-    "lib": ["es2023"]
+    "lib": ["es2022", "DOM", "DOM.iterable"]
   }

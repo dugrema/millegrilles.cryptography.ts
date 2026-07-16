@@ -72,8 +72,8 @@ async function digestContent(value: Uint8Array, digestName: string): Promise<Uin
 export class WrappedHasher {
     baseName: BaseName
     digestName: HashName
-    hasher: IHasher | null
-    digest: string | null
+    hasher: IHasher | null | undefined;
+    digest: string | null | undefined;
 
     constructor(baseName: BaseName, digestName: HashName) {
         this.baseName = baseName;
@@ -81,7 +81,7 @@ export class WrappedHasher {
     }
 
     async init() {
-        this.hasher = await createHasher(this.digestName);
+        this.hasher = await createHasher(this.digestName) || null;
     }
 
     update(chunk: Uint8Array) {
@@ -90,7 +90,8 @@ export class WrappedHasher {
     }
 
     finalize(): string {
-        let digest = this.hasher.digest('binary');
+        const digest = this.hasher?.digest('binary');
+        if(!digest) throw new Error("Hasher is not defined");
         this.digest = multiencoding.hashEncode(this.baseName, this.digestName, digest);
         return this.digest;
     }
