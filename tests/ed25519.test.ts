@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import _sodium from 'libsodium-wrappers';
 import { loadSigningKeyFromPems, signMessage, verifyMessageSignature, messageSigningKeyFromBytes } from '../lib/ed25519'
 

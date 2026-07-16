@@ -1,3 +1,4 @@
+import "reflect-metadata";
 // import * as x509 from "@peculiar/x509";
 // import { Crypto } from "@peculiar/webcrypto";
 import {
@@ -249,18 +250,17 @@ test("test generate CSR", async () => {
 
 test("test split key/pem", () => {
   const inputString1 = PRIVATE_1 + CERTIFICATE_1.join("\n");
-  console.debug("Input: \n" + inputString1);
+  // console.debug("Input: \n" + inputString1);
   let output1 = splitKeyCertPem(inputString1);
-  console.debug(output1.chain);
+  // console.debug(output1.chain);
   expect(output1.chain).toEqual(CERTIFICATE_1);
-  console.debug(output1.key)
   expect(output1.key + "\n").toBe(PRIVATE_1);
 
   const inputString2 = PRIVATE_2 + CERTIFICATE_1.join("\n");
-  console.debug("Input: \n" + inputString2);
+  // console.debug("Input: \n" + inputString2);
   let output2 = splitKeyCertPem(inputString2);
-  console.debug(output2.chain);
+  // console.debug(output2.chain);
   expect(output2.chain).toEqual(CERTIFICATE_1);
-  console.debug(output2.key)
+  // console.debug(output2.key)
   expect(output2.key + "\n").toBe(PRIVATE_2);
 })

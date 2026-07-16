@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { createCsr, loadPrivateKey, verifyUserCsr } from '../lib/forgeCsr';
 import { decodeHex } from '../lib/multiencoding';
 

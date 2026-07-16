@@ -1,4 +1,5 @@
-import stringify from 'json-stable-stringify'
+import "reflect-metadata";
+import stringify from 'json-stable-stringify';
 import pako from 'pako';
 
 import { digest } from './digest';

@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import stringify from 'json-stable-stringify';
 import { loadPrivateKeyEd25519, wrapperFromPems } from '../lib/certificates';
 import { newMessageSigningKey } from '../lib/ed25519';
