@@ -33,7 +33,7 @@
     "rollup": "^4.62.2",
     "ts-jest": "29.4.11",
     "ts-node": "^10.9.2",
-    "typescript": "6.0.3"
+    "typescript": "^6.0.3"
   },
   "dependencies": {
     "@dugrema/node-forge": "github:dugrema/forge#ed25519",
