@@ -616,3 +616,36 @@ export async function generateCsr(
 
   return { csr: csr.toString(), keys };
 }
+
+export type SplitPemResult = {"key": string | null, "chain": string[]}
+
+/**
+ * Splits a PEM string containing a private key and one or more certificates.
+ * 
+ * @param {string} pem - The input PEM formatted string.
+ * @returns {{key: string|null, chain: string[]}} An object containing the private key and the certificate chain.
+ */
+export function splitKeyCertPem(pem: string): SplitPemResult {
+  // Regex to find PEM blocks. 
+  // It captures the header type in group 1 and uses \1 to ensure the END tag matches the BEGIN tag.
+  // [\s\S]*? performs a non-greedy match for any character including newlines.
+  const regex = /-----BEGIN ([\w\s]+)-----[\s\S]*?-----END \1-----/g;
+  
+  const matches = Array.from(pem.matchAll(regex));
+  
+  let key = null;
+  const chain = [];
+
+  for (const match of matches) {
+    const block = match[0];
+    
+    // Determine if the block is a private key or a certificate based on its header.
+    if (block.includes('PRIVATE KEY')) {
+      key = block;
+    } else if (block.includes('CERTIFICATE')) {
+      chain.push(block);
+    }
+  }
+
+  return { key, chain };
+}
