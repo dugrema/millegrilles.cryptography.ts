@@ -21,36 +21,38 @@ import { parseMessage } from "../lib/messageStruct";
 
 const CERTIFICATE_1 = [
   `-----BEGIN CERTIFICATE-----
-MIIClDCCAkagAwIBAgIUWHv6wVkTqJmMpo3VrvJObORofB8wBQYDK2VwMHIxLTAr
-BgNVBAMTJGM3YjAxMWVhLTU4OTEtNGYxNS04MTJmLWRlMTU3MThjZDMyODFBMD8G
-A1UEChM4emJhVGVNRlhwdnVBTEdjUEx4N1VZRmpXMm9DejhmYkRweXlzZTVib1pC
-MjJWWDhOdlNRZk1hU1IwHhcNMjUxMjA5MTg1NTM3WhcNMjYwMTA5MTg1NTU3WjCB
-gTEtMCsGA1UEAwwkYzdiMDExZWEtNTg5MS00ZjE1LTgxMmYtZGUxNTcxOGNkMzI4
-MQ0wCwYDVQQLDARjb3JlMUEwPwYDVQQKDDh6YmFUZU1GWHB2dUFMR2NQTHg3VVlG
-alcyb0N6OGZiRHB5eXNlNWJvWkIyMlZYOE52U1FmTWFTUjAqMAUGAytlcAMhALb4
-oMqblMm2CEuwWQE41SCJ7rQaJmJQe6K+a/azH8d6o4HdMIHaMCsGBCoDBAAEIzQu
-c2VjdXJlLDMucHJvdGVnZSwyLnByaXZlLDEucHVibGljMAwGBCoDBAEEBGNvcmUw
-TAYEKgMEAgREQ29yZUJhY2t1cCxDb3JlQ2F0YWxvZ3VlcyxDb3JlTWFpdHJlRGVz
-Q29tcHRlcyxDb3JlUGtpLENvcmVUb3BvbG9naWUwDwYDVR0RBAgwBoIEY29yZTAf
-BgNVHSMEGDAWgBSSE8NA+02Ib1R8Yjf1OEb0MBaQ3TAdBgNVHQ4EFgQUz/tsB0TY
-NwdHofQc1JImjRoJ1PMwBQYDK2VwA0EAm3MPh1GwesqaMfpPnj6OfblDotZPHinv
-gU444ZqlKuPC2R+Y9ROq1b4HMGP2eOdLnK4oKktUF09DD/SOaQn3Cw==
+MIICpDCCAlagAwIBAgIUDrIecGiOHbBFu1SyezbdqGolg28wBQYDK2VwMIGBMS0w
+KwYDVQQDDCRmZDNkMzQ1NS1hNGYxLTRjM2YtYmRlNi02ZmIxOTBlOTYyYzIxDTAL
+BgNVBAsMBGRldjExQTA/BgNVBAoMOHphTEpRQ1U4bVl5WkJUVU5Iak5XYUtGMXdF
+bTltckdybUhMVEQyeWVmRXk1RXFRM2FHQTdMS2NXMB4XDTI2MDcxNzEwNDczMFoX
+DTI2MDgxNzEwNDc1MFowgYExLTArBgNVBAMMJGZkM2QzNDU1LWE0ZjEtNGMzZi1i
+ZGU2LTZmYjE5MGU5NjJjMjENMAsGA1UECwwEY29yZTFBMD8GA1UECgw4emFMSlFD
+VThtWXlaQlRVTkhqTldhS0Yxd0VtOW1yR3JtSExURDJ5ZWZFeTVFcVEzYUdBN0xL
+Y1cwKjAFBgMrZXADIQD1zK193whb7Hx8mj3JWAvLchGx247pxpKn+cIrNQJeVqOB
+3TCB2jArBgQqAwQABCM0LnNlY3VyZSwzLnByb3RlZ2UsMi5wcml2ZSwxLnB1Ymxp
+YzAMBgQqAwQBBARjb3JlMEwGBCoDBAIERENvcmVCYWNrdXAsQ29yZUNhdGFsb2d1
+ZXMsQ29yZU1haXRyZURlc0NvbXB0ZXMsQ29yZVBraSxDb3JlVG9wb2xvZ2llMA8G
+A1UdEQQIMAaCBGNvcmUwHwYDVR0jBBgwFoAUes4C9GF+PsOI3sjeac/FhUmhcZkw
+HQYDVR0OBBYEFNdFfdZ9USEvjGlp94EPlDGE4iG+MAUGAytlcANBABcS3zOecijT
+ciClLbC81e+HpwsJQtpVKSyKNFQnw7kn4N8IQanWSb4/Y/xzewQdSubINSRprFWI
++CoXWaRxcQ8=
 -----END CERTIFICATE-----`,
   `-----BEGIN CERTIFICATE-----
-MIIBozCCAVWgAwIBAgIKE2QnGAZJU4NxOTAFBgMrZXAwFjEUMBIGA1UEAxMLTWls
-bGVHcmlsbGUwHhcNMjUxMDE4MTQwNzQwWhcNMjcwNDI5MTQwNzQwWjByMS0wKwYD
-VQQDEyRjN2IwMTFlYS01ODkxLTRmMTUtODEyZi1kZTE1NzE4Y2QzMjgxQTA/BgNV
-BAoTOHpiYVRlTUZYcHZ1QUxHY1BMeDdVWUZqVzJvQ3o4ZmJEcHl5c2U1Ym9aQjIy
-Vlg4TnZTUWZNYVNSMCowBQYDK2VwAyEA/eJOlypHH7cZ7JMs+cIS3F1nJ2zEhLhn
-8bRbdq8ZkuajYzBhMBIGA1UdEwEB/wQIMAYBAf8CAQAwCwYDVR0PBAQDAgEGMB0G
-A1UdDgQWBBSSE8NA+02Ib1R8Yjf1OEb0MBaQ3TAfBgNVHSMEGDAWgBRga8F75mOH
-5uZ1uWVsFBxVcZ8qiDAFBgMrZXADQQDw7Em9hXIpg2DaUa6l0GEUcvUxUPHh59La
-PA4L2EcDWo49brIk0Ld89XI0qRKNxyGQAfIXm0f+9QEwbS+oWxgA
+MIIBzjCCAYCgAwIBAgIUasiODCs5UF1gEv9MUJFMXr+30e0wBQYDK2VwMCcxDTAL
+BgNVBAMMBGRldjExFjAUBgNVBAoMDU1pbGxlR3JpbGxsZXMwHhcNMjYwNzE3MTA0
+NzQzWhcNMjgwMTE1MTA0NzQzWjCBgTEtMCsGA1UEAwwkZmQzZDM0NTUtYTRmMS00
+YzNmLWJkZTYtNmZiMTkwZTk2MmMyMQ0wCwYDVQQLDARkZXYxMUEwPwYDVQQKDDh6
+YUxKUUNVOG1ZeVpCVFVOSGpOV2FLRjF3RW05bXJHcm1ITFREMnllZkV5NUVxUTNh
+R0E3TEtjVzAqMAUGAytlcAMhACjEB4twcM8Juuf2n/HkriyJXgdcF/GraW/NtkhH
+cPLZo2MwYTALBgNVHQ8EBAMCAQYwEgYDVR0TAQH/BAgwBgEB/wIBADAdBgNVHQ4E
+FgQUes4C9GF+PsOI3sjeac/FhUmhcZkwHwYDVR0jBBgwFoAU7aDBOZ2i81ujBRrl
+NJgI8npO0fowBQYDK2VwA0EAhcd7osn4wRKCI8qccj4dkQ15dVbeTSFXz6hsCxxt
+aS103Trwx/Qr1YsmkgVcBlH0pTRDpKfsJpG7IFsMM4nbDA==
 -----END CERTIFICATE-----`,
 ];
 
 const PRIVATE_1 = `-----BEGIN PRIVATE KEY-----
-MC4CAQAwBQYDK2VwBCIEIA7VRb79082AF1FmkaveVcENAUGjNZDAb2fvcdYxnqV/
+MC4CAQAwBQYDK2VwBCIEIOxkbFOs0LrjDdutNIXhI45fJE7SDMmzAHB5Doihl5E2
 -----END PRIVATE KEY-----
 `;
 
@@ -60,13 +62,14 @@ MC4CAQAwBQYDK2VwBCIEIA7VRb79082AF1FmkaveVcENAUGjNZDAb2fvcdYxnqV/
 `;
 
 const MILLEGRILLE_CERT = `-----BEGIN CERTIFICATE-----
-MIIBQzCB9qADAgECAgoXGIiSN1JwgpUSMAUGAytlcDAWMRQwEgYDVQQDEwtNaWxs
-ZUdyaWxsZTAeFw0yNDA3MTMyMDMwMDFaFw00NDA3MTMyMDMwMDFaMBYxFDASBgNV
-BAMTC01pbGxlR3JpbGxlMCowBQYDK2VwAyEAsJIE69qSt+GKywKsu/3LU31FkowZ
-W5OSgvDFQ34PkKGjYDBeMA8GA1UdEwEB/wQFMAMBAf8wCwYDVR0PBAQDAgLkMB0G
-A1UdDgQWBBRga8F75mOH5uZ1uWVsFBxVcZ8qiDAfBgNVHSMEGDAWgBRga8F75mOH
-5uZ1uWVsFBxVcZ8qiDAFBgMrZXADQQAlt1NbEwEIOJi+qprkQp8GOmdvn+hQsM2R
-RftTlHVzaecD36Ia4rItgfqOmJp9w925MwQibK0Z86mOXXTiyTkE
+MIIBcDCCASKgAwIBAgIUNzEsSqTcgn9Ho+Ie6mhQg5uLe/kwBQYDK2VwMCcxDTAL
+BgNVBAMMBGRldjExFjAUBgNVBAoMDU1pbGxlR3JpbGxsZXMwHhcNMjYwNzE3MTA0
+NzQzWhcNNDYwNzEyMTA0NzQzWjAnMQ0wCwYDVQQDDARkZXYxMRYwFAYDVQQKDA1N
+aWxsZUdyaWxsbGVzMCowBQYDK2VwAyEAL8ZbpltklpzCnbi7+YtWqCjIM8sXXy+a
+iVp6SaEKYWejYDBeMAsGA1UdDwQEAwIC5DAPBgNVHRMBAf8EBTADAQH/MB0GA1Ud
+DgQWBBTtoME5naLzW6MFGuU0mAjyek7R+jAfBgNVHSMEGDAWgBTtoME5naLzW6MF
+GuU0mAjyek7R+jAFBgMrZXADQQAMsJnxO6Zzrj7adifPgdfJCqnCK7KhLQXclxrQ
+dSbP42pSZHEXVrKsRwqkkI+g87QFgBQcCmQhyeXeKnS/MZgE
 -----END CERTIFICATE-----`;
 
 const CA_PRIVATE_KEY = new Uint8Array(
@@ -107,13 +110,13 @@ test("cert-wrapper-publicKey", async () => {
   const certificateWrapper = wrapperFromPems(CERTIFICATE_1);
   const publicKey = certificateWrapper.getPublicKey();
   expect(publicKey).toStrictEqual(
-    "b6f8a0ca9b94c9b6084bb0590138d52089eeb41a2662507ba2be6bf6b31fc77a",
+    "f5ccad7ddf085bec7c7c9a3dc9580bcb7211b1db8ee9c692a7f9c22b35025e56",
   );
 });
 
 test("cert-wrapper-verify-date", async () => {
   const certificateWrapper = wrapperFromPems(CERTIFICATE_1, MILLEGRILLE_CERT);
-  const result = await certificateWrapper.verify(null as any, new Date("2025-12-14"));
+  const result = await certificateWrapper.verify(null as any, new Date("2026-07-18"));
   expect(result).toBe(true);
 });
 
@@ -162,13 +165,13 @@ test("cert-wrapper-extensions", async () => {
 test("cert-wrapper-verify-commonName", async () => {
   let certificateWrapper = wrapperFromPems(CERTIFICATE_1);
   let commonName = certificateWrapper.getCommonName();
-  expect(commonName).toBe("c7b011ea-5891-4f15-812f-de15718cd328");
+  expect(commonName).toBe("fd3d3455-a4f1-4c3f-bde6-6fb190e962c2");
 });
 
 test("cert-getIdmg", async () => {
   let idmg = await getIdmg(MILLEGRILLE_CERT);
   expect(idmg).toStrictEqual(
-    "zbaTeMFXpvuALGcPLx7UYFjW2oCz8fbDpyyse5boZB22VX8NvSQfMaSR",
+    "zaLJQCU8mYyZBTUNHjNWaKF1wEm9mrGrmHLTD2yefEy5EqQ3aGA7LKcW",
   );
 });
 
@@ -176,10 +179,9 @@ test("private key load", async () => {
   let key = loadPrivateKeyEd25519(PRIVATE_1);
   expect((Buffer as any).from(key)).toStrictEqual(
   (Buffer as any).from(
-      "01234567890123456789012345678901234567890123456789012345678901234",
+      "ec646c53acd0bae30ddbad3485e1238e5f244ed20cc9b30070790e88a1979136",
       "hex",
     ),
-
   );
 });
 
@@ -203,7 +205,7 @@ test("test store cache", async () => {
   expect(result).toBe(true);
 
   let wrapper = await store.cache.getCertificate(
-    "b6f8a0ca9b94c9b6084bb0590138d52089eeb41a2662507ba2be6bf6b31fc77a",
+    "f5ccad7ddf085bec7c7c9a3dc9580bcb7211b1db8ee9c692a7f9c22b35025e56",
   );
   expect(wrapper).toBeDefined();
 
@@ -211,7 +213,7 @@ test("test store cache", async () => {
   await new Promise((resolve) => setTimeout(resolve, 5)); // Wait 5 ms
   await store.cache.maintain(1); // Mark entries older than 1ms as expired
   wrapper = await store.cache.getCertificate(
-    "b6f8a0ca9b94c9b6084bb0590138d52089eeb41a2662507ba2be6bf6b31fc77a",
+    "f5ccad7ddf085bec7c7c9a3dc9580bcb7211b1db8ee9c692a7f9c22b35025e56",
   );
   expect(wrapper).toBeUndefined();
 });
