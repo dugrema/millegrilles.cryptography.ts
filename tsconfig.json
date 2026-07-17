@@ -5,7 +5,11 @@
       "target": "es2023",
       "moduleResolution": "bundler",
       "sourceMap": true,
-      "outDir": "dist"
+      "outDir": "dist",
+      "types": [
+        "node",
+        "jest"
+      ]
     },
     "lib": ["es2022", "DOM", "DOM.iterable"]
   }

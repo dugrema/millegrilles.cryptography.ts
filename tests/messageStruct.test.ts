@@ -152,7 +152,7 @@ test('create encrypted command', async () => {
     expect(message.kind).toBe(MessageKind.EncryptedCommand);
     expect(message.id).toBeTruthy();  // Encrypted content changes every time
     expect(message.dechiffrage).toBeTruthy();
-    expect(message.dechiffrage.signature).toBeTruthy();
+    expect(message.dechiffrage!.signature).toBeTruthy();
     expect(message.sig).toBeTruthy();
     expect(message.contenu).toBeTruthy();
     expect(message.certificat).toStrictEqual(CERTIFICATE_1);
@@ -177,7 +177,7 @@ test('serialize-deserialize message', async () => {
 
     let jsonMessage = stringify(message);
 
-    let deserializedMessage = parseMessage(jsonMessage);
+    let deserializedMessage = parseMessage(jsonMessage!);
     let result = await deserializedMessage.verify();
     expect(result).toBe(true);
 

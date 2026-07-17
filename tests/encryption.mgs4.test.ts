@@ -9,15 +9,15 @@ test('encrypt-decrypt 100b', async () => {
     let output = await cipher.update(BUFFER_100b);
     let finalOutput = await cipher.finalize();
     expect(output).toBeNull()
-    expect(finalOutput.length).toBe(117)
+    expect(finalOutput!.length).toBe(117)
 
     let {header, key, digest} = cipher;
     expect(header).toBeTruthy()
     expect(key).toBeTruthy()
-    expect(digest.length).toBe(64)
+    expect(digest!.length).toBe(64)
 
     let decipher = await getMgs4Decipher(key, header);
-    let clear1 = await decipher.update(finalOutput);
+    let clear1 = await decipher.update(finalOutput!)
     let clear2 = await decipher.finalize();
     expect(clear1).toBeNull()
     expect(clear2).toStrictEqual(BUFFER_100b);
@@ -27,22 +27,22 @@ test('encrypt-decrypt 100k', async () => {
     let cipher = await getMgs4Cipher();
     let output = await cipher.update(BUFFER_100k);
     let finalOutput = await cipher.finalize();
-    expect(output.length).toBe(65536)
-    expect(finalOutput.length).toBe(34498)
+    expect(output!.length).toBe(65536)
+    expect(finalOutput!.length).toBe(34498)
 
     let {header, key, digest} = cipher;
     expect(header).toBeTruthy()
     expect(key).toBeTruthy()
-    expect(digest.length).toBe(64)
+    expect(digest!.length).toBe(64)
 
     let decipher = await getMgs4Decipher(key, header);
-    let clear1 = await decipher.update(output);
-    let clear2 = await decipher.update(finalOutput);
-    let clear3 = await decipher.finalize();
-    expect(clear1.length).toBe(65519)
+    let clear1 = await decipher.update(output!)
+    let clear2 = await decipher.update(finalOutput!)
+    let clear3 = await decipher.finalize()
+    expect(clear1!.length).toBe(65519)
     expect(clear2).toBeNull()
-    expect(clear3.length).toBe(34481)
-    expect(Buffer.concat([clear1, clear3])).toStrictEqual(Buffer.from(BUFFER_100k));
+    expect(clear3!.length).toBe(34481)
+    expect(Buffer.concat([clear1!, clear3!])).toStrictEqual(Buffer.from(BUFFER_100k));
 });
 
 test('encrypt-decrypt 1MB', async () => {
@@ -50,27 +50,27 @@ test('encrypt-decrypt 1MB', async () => {
     let output: Uint8Array[] = []
     for(let i=0; i<10; i++) {
         let out = await cipher.update(BUFFER_100k);
-        output.push(out)
+        if (out) output.push(out)
     }
     let finalOutput = await cipher.finalize();
     let outputBuffer = Buffer.concat(output)
     expect(outputBuffer.length).toBe(983040)
-    expect(finalOutput.length).toBe(17232)
+    expect(finalOutput!.length).toBe(17232)
 
     let {header, key, digest} = cipher;
     expect(header).toBeTruthy()
     expect(key).toBeTruthy()
-    expect(digest.length).toBe(64)
+    expect(digest!.length).toBe(64)
 
     let decipher = await getMgs4Decipher(key, header);
     let clear1 = await decipher.update(outputBuffer);
-    let clear2 = await decipher.update(finalOutput);
+    let clear2 = await decipher.update(finalOutput!);
     let clear3 = await decipher.finalize();
-    expect(clear1.length).toBe(982785);
+    expect(clear1!.length).toBe(982785);
     expect(clear2).toBeNull();
-    expect(clear3.length).toBe(17215);
+    expect(clear3!.length).toBe(17215);
     // Check only first part (BUFFER_2 is repeated)
-    expect(Buffer.from(clear1).subarray(0,BUFFER_100k.length)).toStrictEqual(Buffer.from(BUFFER_100k));
+    expect(Buffer.from(clear1!).subarray(0,BUFFER_100k.length)).toStrictEqual(Buffer.from(BUFFER_100k));
 });
 
 // test('encrypt-decrypt 100MB', async () => {
@@ -88,7 +88,7 @@ test('encrypt-decrypt 1MB', async () => {
 //     let {header, key, digest} = cipher;
 //     expect(header).toBeTruthy()
 //     expect(key).toBeTruthy()
-//     expect(digest.length).toBe(64)
+//     expect(digest!.length).toBe(64)
 
 //     let decipher = await getMgs4Decipher(key, header);
 //     let clear1 = await decipher.update(outputBuffer);
@@ -105,19 +105,19 @@ test('encrypt-decrypt exact blocksize', async () => {
     let cipher = await getMgs4Cipher();
     let output = await cipher.update(BUFFER_EXACT);
     let finalOutput = await cipher.finalize();
-    expect(output.length).toBe(65536)
-    expect(finalOutput.length).toBe(17)
+    expect(output!.length).toBe(65536)
+    expect(finalOutput!.length).toBe(17)
 
     let {header, key, digest} = cipher;
     expect(header).toBeTruthy()
     expect(key).toBeTruthy()
-    expect(digest.length).toBe(64)
+    expect(digest!.length).toBe(64)
 
     let decipher = await getMgs4Decipher(key, header);
-    let clear1 = await decipher.update(output);
-    let clear2 = await decipher.update(finalOutput);
+    let clear1 = await decipher.update(output!);
+    let clear2 = await decipher.update(finalOutput!);
     let clear3 = await decipher.finalize();
-    expect(clear1).toStrictEqual(BUFFER_EXACT);
+    expect(clear1!).toStrictEqual(BUFFER_EXACT);
     expect(clear2).toBeNull();
     expect(clear3).toBeNull();
 });

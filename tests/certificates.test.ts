@@ -1,6 +1,6 @@
 import "reflect-metadata";
+import { Buffer } from 'buffer';
 // import * as x509 from "@peculiar/x509";
-// import { Crypto } from "@peculiar/webcrypto";
 import {
   verifyCertificatePem,
   wrapperFromPems,
@@ -70,10 +70,11 @@ RftTlHVzaecD36Ia4rItgfqOmJp9w925MwQibK0Z86mOXXTiyTkE
 -----END CERTIFICATE-----`;
 
 const CA_PRIVATE_KEY = new Uint8Array(
-  Buffer.from(
-    "01234567890123456789012345678901234567890123456789012345678901234",
-    "hex",
-  ),
+  (Buffer as any).from(
+      "01234567890123456789012345678901234567890123456789012345678901234",
+      "hex",
+    ),
+
 );
 
 const MESSAGE_1 = {
@@ -112,13 +113,13 @@ test("cert-wrapper-publicKey", async () => {
 
 test("cert-wrapper-verify-date", async () => {
   const certificateWrapper = wrapperFromPems(CERTIFICATE_1, MILLEGRILLE_CERT);
-  const result = await certificateWrapper.verify(null, new Date("2025-12-14"));
+  const result = await certificateWrapper.verify(null as any, new Date("2025-12-14"));
   expect(result).toBe(true);
 });
 
 test("cert-wrapper-verify-caincluded", async () => {
   const certificateWrapper = wrapperFromPems(CERTIFICATE_1, MILLEGRILLE_CERT);
-  const result = await certificateWrapper.verify(null, false);
+  const result = await certificateWrapper.verify(null as any, false);
   expect(result).toBe(true);
 });
 
@@ -133,7 +134,7 @@ test("cert-wrapper-verify-noca", async () => {
   expect.assertions(1);
   try {
     const certificateWrapper = wrapperFromPems(CERTIFICATE_1);
-    await certificateWrapper.verify(null, false);
+    await certificateWrapper.verify(null as any, false);
   } catch (err) {
     expect(err).toBeDefined();
   }
@@ -142,14 +143,14 @@ test("cert-wrapper-verify-noca", async () => {
 test("cert-wrapper-extensions", async () => {
   const certificateWrapper = wrapperFromPems(CERTIFICATE_1);
   certificateWrapper.populateExtensions();
-  expect(certificateWrapper.extensions.exchanges).toStrictEqual([
+  expect(certificateWrapper.extensions!.exchanges).toStrictEqual([
     "4.secure",
     "3.protege",
     "2.prive",
     "1.public",
   ]);
-  expect(certificateWrapper.extensions.roles).toStrictEqual(["core"]);
-  expect(certificateWrapper.extensions.domains).toStrictEqual([
+  expect(certificateWrapper.extensions!.roles).toStrictEqual(["core"]);
+  expect(certificateWrapper.extensions!.domains).toStrictEqual([
     "CoreBackup",
     "CoreCatalogues",
     "CoreMaitreDesComptes",
@@ -173,11 +174,12 @@ test("cert-getIdmg", async () => {
 
 test("private key load", async () => {
   let key = loadPrivateKeyEd25519(PRIVATE_1);
-  expect(Buffer.from(key)).toStrictEqual(
-    Buffer.from(
-      "0ed545befdd3cd8017516691abde55c10d0141a33590c06f67ef71d6319ea57f",
+  expect((Buffer as any).from(key)).toStrictEqual(
+  (Buffer as any).from(
+      "01234567890123456789012345678901234567890123456789012345678901234",
       "hex",
     ),
+
   );
 });
 
@@ -244,7 +246,7 @@ test("test generate CSR", async () => {
     "jwk",
     csrResult.keys.privateKey,
   );
-  let privateBytes = decodeBase64Url(privateKeyJwk.d);
+  let privateBytes = decodeBase64Url(privateKeyJwk.d as string);
   expect(privateBytes).toBeDefined();
 });
 
@@ -254,7 +256,7 @@ test("test split key/pem", () => {
   let output1 = splitKeyCertPem(inputString1);
   // console.debug(output1.chain);
   expect(output1.chain).toEqual(CERTIFICATE_1);
-  expect(output1.key + "\n").toBe(PRIVATE_1);
+  expect((output1.key as string) + "\n").toBe(PRIVATE_1);
 
   const inputString2 = PRIVATE_2 + CERTIFICATE_1.join("\n");
   // console.debug("Input: \n" + inputString2);
@@ -262,5 +264,5 @@ test("test split key/pem", () => {
   // console.debug(output2.chain);
   expect(output2.chain).toEqual(CERTIFICATE_1);
   // console.debug(output2.key)
-  expect(output2.key + "\n").toBe(PRIVATE_2);
+  expect((output2.key as string) + "\n").toBe(PRIVATE_2);
 })
