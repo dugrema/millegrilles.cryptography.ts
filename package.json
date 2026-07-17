@@ -32,7 +32,6 @@
     "eslint": "^9.39.2",
     "jest": "30.2.0",
     "rimraf": "^6.1.2",
-    "rollup": "^3.30.0",
     "rollup-plugin-dts": "^6.3.0",
     "rollup-plugin-import-assertions": "^0.5.0",
     "rollup-plugin-polyfill-node": "^0.13.0",
