@@ -32,11 +32,11 @@ export function baseEncode(encoding: multibase.BaseName, value: Uint8Array): str
     // https://github.com/multiformats/rust-multibase/blob/master/src/base.rs
     switch(encoding) {
         case 'base58btc':
-            return String.fromCharCode.apply(null, multibase.encode('base58btc', value))
+            return String.fromCharCode.apply(null, Array.from(multibase.encode('base58btc', value)))
         case 'base64pad':
-            return String.fromCharCode.apply(null, multibase.encode('base64pad', value))
+            return String.fromCharCode.apply(null, Array.from(multibase.encode('base64pad', value)))
         case 'base64':
-            return String.fromCharCode.apply(null, multibase.encode('base64', value))
+            return String.fromCharCode.apply(null, Array.from(multibase.encode('base64', value)))
         default:
             throw new Error(`Encoding ${encoding} is not supported`);
     }
@@ -57,7 +57,7 @@ export function baseDecode(value: string): Uint8Array {
  */
 export function encodeBase64Nopad(value: Uint8Array): string {
     // Return the encoded value without the multibase 'm' flag
-    return String.fromCharCode.apply(null, multibase.encode('base64', value).slice(1));
+    return String.fromCharCode.apply(null, Array.from(multibase.encode('base64', value).slice(1)));
 }
 
 export function decodeBase64Nopad(value: string): Uint8Array {
@@ -66,7 +66,7 @@ export function decodeBase64Nopad(value: string): Uint8Array {
 
 export function encodeBase64Url(value: Uint8Array): string {
     // Return the encoded value without the multibase 'u' flag
-    return String.fromCharCode.apply(null, multibase.encode('base64url', value).slice(1));
+    return String.fromCharCode.apply(null, Array.from(multibase.encode('base64url', value).slice(1)));
 }
 
 export function decodeBase64Url(value: string): Uint8Array {
@@ -75,7 +75,7 @@ export function decodeBase64Url(value: string): Uint8Array {
 
 export function encodeBase64(value: Uint8Array): string {
     // Return the encoded value without the multibase 'm' flag
-    return String.fromCharCode.apply(null, multibase.encode('base64pad', value).slice(1));
+    return String.fromCharCode.apply(null, Array.from(multibase.encode('base64pad', value).slice(1)));
 }
 
 export function decodeBase64(value: string): Uint8Array {
@@ -84,7 +84,7 @@ export function decodeBase64(value: string): Uint8Array {
 
 export function encodeBase58btc(value: Uint8Array): string {
     // Return the encoded value without the multibase 'z' flag
-    return String.fromCharCode.apply(null, multibase.encode('base58btc', value).slice(1));
+    return String.fromCharCode.apply(null, Array.from(multibase.encode('base58btc', value).slice(1)));
 }
 
 export function decodeBase58btc(value: string): Uint8Array {

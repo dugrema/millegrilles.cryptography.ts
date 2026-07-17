@@ -1,11 +1,15 @@
 {
     "compilerOptions": {
-      "module": "commonjs",
+      "module": "es2022",
       "esModuleInterop": true,
-      "target": "es6",
-      "moduleResolution": "node",
+      "target": "es2023",
+      "moduleResolution": "bundler",
       "sourceMap": true,
-      "outDir": "dist"
+      "outDir": "dist",
+      "types": [
+        "node",
+        "jest"
+      ]
     },
-    "lib": ["es2023"]
+    "lib": ["es2022", "DOM", "DOM.iterable"]
   }

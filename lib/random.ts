@@ -3,7 +3,7 @@
  * @param byteLen Length of the array to generate.
  */
 export function getRandom(byteLen: number): Uint8Array {
-    let abView: Uint8Array;
+    let abView: any;
     let cryptoHandle: any;
     if( typeof(window) !== 'undefined' && window.crypto) {
         // Browser
@@ -20,7 +20,7 @@ export function getRandom(byteLen: number): Uint8Array {
     } else if( typeof(crypto) !== 'undefined' ) {
         // Nodejs
         abView = new Uint8Array(byteLen);
-        abView = crypto.getRandomValues(abView);
+        crypto.getRandomValues(abView);
     } else {
         throw new Error('random generator not available');
     }

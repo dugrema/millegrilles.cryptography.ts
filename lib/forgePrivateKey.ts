@@ -86,7 +86,7 @@ export async function generateMilleGrilleCertificate(password: string): Promise<
     // Exporter sous format PEM
     var pem = pki.certificateToPem(cert).replaceAll(/\r/g, '');
   
-    return {cert, certPem: pem, encryptedPem};
+    return {cert, certPem: pem, encryptedPem: encryptedPem ?? ''};
 }
 
 function generateRandomSerialNumber() {

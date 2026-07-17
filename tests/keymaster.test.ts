@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { DomainSignature } from "../lib/keymaster";
 
 const CA_PRIVATE_KEY = new Uint8Array(Buffer.from('01234567890123456789012345678901234567890123456789012345678901234', 'hex'));

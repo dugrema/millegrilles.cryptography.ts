@@ -11,13 +11,14 @@ const CURRENT_VERSION = 1;
 export class DomainSignature {
     domaines: string[];
     version: number;
-    signature: string;  // Base64 no padding encoding of the signed domain.
+    signature?: string;  // Base64 no padding encoding of the signed domain.
     ca?: string;
 
     constructor(domaines: string[], version?: number, ca?: string) {
         this.domaines = domaines;
         this.version = typeof(version)==='number'?version:CURRENT_VERSION;
         this.ca = ca;
+        this.signature = '';
     }
 
     /**
@@ -29,7 +30,9 @@ export class DomainSignature {
     }
 
     async verify(secretKey: Uint8Array): Promise<boolean> {
-        return await verifyDomains(secretKey, this.domaines, this.signature);
+        const signature = this.signature;
+        if(!signature) throw new Error("Signature missing");
+        return await verifyDomains(secretKey, this.domaines, signature);
     }
 
     /**
@@ -116,9 +119,9 @@ export type EncryptionBase64Result = {
 export function encryptionResultToBase64(value: EncryptionResult): EncryptionBase64Result {
     return {
         format: value.format,
-        nonce: value.nonce?multiencoding.encodeBase64(value.nonce):null,
+        nonce: multiencoding.encodeBase64(value.nonce),
         ciphertext_base64: multiencoding.encodeBase64(value.ciphertext),
-        digest: value.digest?multiencoding.encodeBase64(value.digest):null,
+        digest: value.digest ? multiencoding.encodeBase64(value.digest) : undefined,
         cle: value.cle,
         cle_id: value.cle_id,
         cleSecrete: value.cleSecrete,
