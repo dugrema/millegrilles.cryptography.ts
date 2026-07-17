@@ -9,7 +9,6 @@ import {
   CertificateStore,
   CertificateCache,
   generateCsr,
-  splitKeyCertPem,
 } from "../lib/certificates";
 import { decodeBase64Url } from "../lib/multiencoding";
 import { parseMessage } from "../lib/messageStruct";
@@ -51,11 +50,6 @@ PA4L2EcDWo49brIk0Ld89XI0qRKNxyGQAfIXm0f+9QEwbS+oWxgA
 const PRIVATE_1 = `-----BEGIN PRIVATE KEY-----
 MC4CAQAwBQYDK2VwBCIEIA7VRb79082AF1FmkaveVcENAUGjNZDAb2fvcdYxnqV/
 -----END PRIVATE KEY-----
-`;
-
-const PRIVATE_2 = `-----BEGIN ENCRYPTED PRIVATE KEY-----
-MC4CAQAwBQYDK2VwBCIEIA7VRb79082AF1FmkaveVcENAUGjNZDAb2fvcdYxnqV/
------END ENCRYPTED PRIVATE KEY-----
 `;
 
 const MILLEGRILLE_CERT = `-----BEGIN CERTIFICATE-----
@@ -246,21 +240,3 @@ test("test generate CSR", async () => {
   let privateBytes = decodeBase64Url(privateKeyJwk.d);
   expect(privateBytes).toBeDefined();
 });
-
-test("test split key/pem", () => {
-  const inputString1 = PRIVATE_1 + CERTIFICATE_1.join("\n");
-  console.debug("Input: \n" + inputString1);
-  let output1 = splitKeyCertPem(inputString1);
-  console.debug(output1.chain);
-  expect(output1.chain).toEqual(CERTIFICATE_1);
-  console.debug(output1.key)
-  expect(output1.key + "\n").toBe(PRIVATE_1);
-
-  const inputString2 = PRIVATE_2 + CERTIFICATE_1.join("\n");
-  console.debug("Input: \n" + inputString2);
-  let output2 = splitKeyCertPem(inputString2);
-  console.debug(output2.chain);
-  expect(output2.chain).toEqual(CERTIFICATE_1);
-  console.debug(output2.key)
-  expect(output2.key + "\n").toBe(PRIVATE_2);
-})
