@@ -29,7 +29,7 @@ class Mgs4Cipher {
     state: _sodium.StateAddress;
     header: Uint8Array;
     hasher: IHasher;
-    excessBuffer: Uint8Array | null;
+    excessBuffer: Uint8Array | null = null;
     digest?: Uint8Array;
 
     constructor(key: Uint8Array, state: _sodium.StateAddress, header: Uint8Array, hasher: IHasher) {
@@ -37,18 +37,19 @@ class Mgs4Cipher {
         this.state = state;
         this.header = header;
         this.hasher = hasher;
+        this.excessBuffer = null;
     }
 
     async update(chunk: Uint8Array): Promise<Uint8Array | null> {
         await _sodium.ready;
         const sodium = _sodium;
 
-        if(!chunk || chunk.byteLength === 0) return;
+        if(!chunk || chunk.byteLength === 0) return null;
 
         let encryptedOutputs: Uint8Array[] = [];
 
         // Concatenate excess buffer with new chunk
-        let bufferInputs = [];
+        let bufferInputs: Uint8Array[] = [];
         if(this.excessBuffer) bufferInputs.push(this.excessBuffer);
         bufferInputs.push(chunk);
         let filledBuffer = concatBuffers(bufferInputs);
@@ -56,7 +57,7 @@ class Mgs4Cipher {
         // Encrypt while there is enough data to fill blocks.
         let position = 0;
         while(filledBuffer.length >= MGS4_ENCRYPT_BLOCK_SIZE + position) {
-            let currentSlice = filledBuffer.slice(position, position+MGS4_ENCRYPT_BLOCK_SIZE)
+            let currentSlice = filledBuffer.slice(position, position+MGS4_ENCRYPT_BLOCK_SIZE);
             
             let encryptedChunk = sodium.crypto_secretstream_xchacha20poly1305_push(
                 this.state, currentSlice, null, 
@@ -83,7 +84,6 @@ class Mgs4Cipher {
             return concatBuffers(encryptedOutputs);
         }
         else {
-            // Chunk too small to produce output.
             return null;
         }
     }
@@ -92,9 +92,8 @@ class Mgs4Cipher {
         await _sodium.ready;
         const sodium = _sodium;
 
-        let finalBuffer = null;
-        if(this.excessBuffer) finalBuffer = this.excessBuffer;
-        let encryptedOutput = sodium.crypto_secretstream_xchacha20poly1305_push(
+        const finalBuffer: Uint8Array = this.excessBuffer ?? new Uint8Array(0);
+        const encryptedOutput = sodium.crypto_secretstream_xchacha20poly1305_push(
             this.state, finalBuffer, null, 
             _sodium.crypto_secretstream_xchacha20poly1305_TAG_FINAL);
         
@@ -105,7 +104,6 @@ class Mgs4Cipher {
 
         this.digest = this.hasher.digest('binary');
         
-        // Extract authentication tag from last 16 bytes
         return encryptedOutput;
     }
 }
@@ -113,7 +111,6 @@ class Mgs4Cipher {
 export async function getMgs4Decipher(key: Uint8Array, header: Uint8Array) {
     await _sodium.ready;
     const sodium = _sodium;
-
 
     let state = sodium.crypto_secretstream_xchacha20poly1305_init_pull(header, key);
     return new Mgs4Decipher(key, state, header)
@@ -123,25 +120,26 @@ class Mgs4Decipher {
     readonly key: Uint8Array;
     state: _sodium.StateAddress;
     header: Uint8Array;
-    hasher: IHasher;
-    excessBuffer: Uint8Array | null;
+    hasher?: IHasher;
+    excessBuffer: Uint8Array | null = null;
 
     constructor(key: Uint8Array, state: _sodium.StateAddress, header: Uint8Array) {
         this.key = key;
         this.state = state;
         this.header = header;
+        this.excessBuffer = null;
     }
 
     async update(chunk: Uint8Array): Promise<Uint8Array | null> {
         await _sodium.ready;
         const sodium = _sodium;
 
-        if(!chunk || chunk.byteLength === 0) return;
+        if(!chunk || chunk.byteLength === 0) return null;
 
         let encryptedOutputs: Uint8Array[] = [];
 
         // Concatenate excess buffer with new chunk
-        let bufferInputs = [];
+        let bufferInputs: Uint8Array[] = [];
         if(this.excessBuffer) bufferInputs.push(this.excessBuffer);
         bufferInputs.push(chunk);
         let filledBuffer = concatBuffers(bufferInputs);
@@ -154,7 +152,7 @@ class Mgs4Decipher {
                 this.state, currentSlice, null);
 
             encryptedOutputs.push(decryptedChunk);
-    
+
             if(tag === _sodium.crypto_secretstream_xchacha20poly1305_TAG_FINAL) {
                 throw new Error("MGS4 TODO Final tag on update");
             }
@@ -175,11 +173,9 @@ class Mgs4Decipher {
         // Convert outputs to Uint8Array if applicable.
         if(encryptedOutputs.length === 1) return encryptedOutputs[0];
         else if(encryptedOutputs.length > 0) {
-            // Concatenate outputs
             return concatBuffers(encryptedOutputs);
         }
         else {
-            // Chunk too small to produce output.
             return null;
         }        
     }
@@ -188,10 +184,10 @@ class Mgs4Decipher {
         await _sodium.ready;
         const sodium = _sodium;
 
-        if(this.excessBuffer == null) return
+        if(this.excessBuffer == null) return null;
 
-        let finalBuffer = new Uint8Array(this.excessBuffer);
-        let {message: decryptedChunk, tag} = sodium.crypto_secretstream_xchacha20poly1305_pull(
+        const finalBuffer = this.excessBuffer;
+        const {message: decryptedChunk, tag} = sodium.crypto_secretstream_xchacha20poly1305_pull(
             this.state, finalBuffer, null);
         
         if(tag !== _sodium.crypto_secretstream_xchacha20poly1305_TAG_FINAL) {

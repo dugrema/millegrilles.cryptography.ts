@@ -29,7 +29,7 @@ export type PreMigration = {};
 
 export type MessageDecryption = {
     cle_id?: string,
-    cles?: Object,
+    cles?: Record<string, string>,
     format: string,
     hachage?: string,
     header?: string,
@@ -48,17 +48,19 @@ export class MilleGrillesMessage {
     routage?: Routage;  // Routing information
     pre_migration?: PreMigration;  // Transaction migration information
     origine?: string;  // System of origin (IDMG)
-    dechiffrage?: MessageDecryption;  // Decryption information.
-    sig: string;  // Message signature
+    dechiffrage?: MessageDecryption;  // Decryption information
+    sig: string = '';  // Message signature
     certificat?: string[];  // PEM certificat chain (excluding the CA/root)
     millegrille?: string;  // PEM certificate of the system (CA/root)
-    attachements?: {}  // Attachments to this message
+    attachements?: Record<string, any>  // Attachments to this message
+    [key: string]: any;
 
     constructor(estampille: number, kind: MessageKind, contenu: string) {
         this.estampille = estampille;
         this.kind = kind;
         this.contenu = contenu;
     }
+
 
     async sign(signingKey: MessageSigningKey) {
         this.pubkey = signingKey.publicKey;
@@ -131,12 +133,12 @@ async function generateMessageId(message: MilleGrillesMessage): Promise<string> 
     }
 
     // Convert to JSON (properly ordered for dict elements)
-    let output: any = stringify(content).normalize();
+    const outputStr = (stringify(content) as string).normalize();
     // Convert to bytes
-    output = new TextEncoder().encode(output.normalize());
+    const outputBytes = new TextEncoder().encode(outputStr);
     
     // Digest with blake2s-256 to hex
-    let digestBytes = await digest(output, {digestName: 'blake2s-256', encoding: 'bytes'})
+    let digestBytes = await digest(outputBytes, {digestName: 'blake2s-256', encoding: 'bytes'})
     if(typeof(digestBytes) === 'string') throw new Error("digest wrong type");
     let digestString = encodeHex(digestBytes);
     
@@ -155,6 +157,7 @@ async function verifyMessage(message: MilleGrillesMessage): Promise<boolean> {
     if(!message.id) throw new Error("Message id is missing");
     let messageId = decodeHex(message.id);
     let signatureBytes = decodeHex(message.sig);
+    if(!message.pubkey) throw new Error("pubkey missing");
     let pubkey = decodeHex(message.pubkey);
     return await verifyMessageSignature(pubkey, messageId, signatureBytes);
 }
@@ -166,7 +169,7 @@ export async function createRoutedMessage(
     
     if(!timestamp) timestamp = new Date();
     let timestampEpoch: number = Math.floor(timestamp.getTime() / 1000);
-    let contentString = stringify(content);
+    let contentString = stringify(content) as string;
     let message = new MilleGrillesMessage(timestampEpoch, kind, contentString);
     message.routage = routing;
     await message.sign(signingKey);
@@ -189,9 +192,9 @@ export async function createResponse(
 async function createSimpleMessage(
     signingKey: MessageSigningKey, kind: MessageKind, content: Object, timestamp?: Date
 ): Promise<MilleGrillesMessage> {
-    if(!timestamp) timestamp = new Date();
-    let timestampEpoch: number = Math.floor(timestamp.getTime() / 1000);
-    let contentString = stringify(content);
+    let currentTimestamp = timestamp ?? new Date();
+    let timestampEpoch: number = Math.floor(currentTimestamp.getTime() / 1000);
+    let contentString = stringify(content) as string;
     let message = new MilleGrillesMessage(timestampEpoch, MessageKind.Document, contentString);
     await message.sign(signingKey);
 
@@ -213,15 +216,15 @@ export async function createEncryptedResponse(
     contentBytes = pako.deflate(contentBytes);
 
     // Encrypt content, serialize with base64nopad
-    let outputBuffers = [];
+    let outputBuffers: (Uint8Array | null)[] = [];
     outputBuffers.push(await cipher.update(contentBytes));
     outputBuffers.push(await cipher.finalize());
-    outputBuffers = outputBuffers.filter(item=>item)  // Remove null buffers
-    let output = concatBuffers(outputBuffers);
+    outputBuffers = outputBuffers.filter((item): item is Uint8Array => !!item);
+    let output = concatBuffers(outputBuffers as Uint8Array[]);
 
     let contentString = encodeBase64Nopad(output);
 
-    let cles = {};
+    let cles: Record<string, string> = {};
     for(let encryptionKey of encryptionKeys) {
         let publicKey = encryptionKey.getPublicKey();
         let publicKeyBytes = decodeHex(publicKey);
@@ -262,14 +265,14 @@ export async function createEncryptedCommand(
     contentBytes = pako.gzip(contentBytes);
 
     // Encrypt content, serialize with base64nopad
-    let outputBuffers = [];
+    let outputBuffers: (Uint8Array | null)[] = [];
     outputBuffers.push(await cipher.update(contentBytes));
     outputBuffers.push(await cipher.finalize());
-    outputBuffers = outputBuffers.filter(item=>item)  // Remove null buffers
-    let output = concatBuffers(outputBuffers);
+    outputBuffers = outputBuffers.filter((item): item is Uint8Array => !!item);
+    let output = concatBuffers(outputBuffers as Uint8Array[]);
     let contentString = encodeBase64Nopad(output);
 
-    let cles = {};
+    let cles: Record<string, string> = {};
     for(let encryptionKey of encryptionKeys) {
         let publicKey = encryptionKey.getPublicKey();
         let publicKeyBytes = decodeHex(publicKey);
@@ -277,7 +280,7 @@ export async function createEncryptedCommand(
         cles[publicKey] = encryptedSecret;
     }
 
-    let domainSignature = new DomainSignature([routing.domaine], 1);
+    let domainSignature = new DomainSignature(routing.domaine ? [routing.domaine] : [], 1);
     await domainSignature.sign(secret.secret);
 
     // Populate decryption information
@@ -303,9 +306,10 @@ async function decryptMessageContent(
     decryptionKey: MessageSigningKey, kind: MessageKind, decryption: MessageDecryption, content: string, compressed?: boolean
 ): Promise<string> {
     let pubId = decryptionKey.publicKey;
-    let encryptedKey = decryption.cles[pubId];
+    const encryptedKey = decryption.cles?.[pubId];
     if(!encryptedKey) throw new Error("No matching key found to decrypt message");
-    let headerBytes = decodeBase64Nopad(decryption.nonce);
+    if(!decryption.nonce) throw new Error("nonce missing");
+    const headerBytes = decodeBase64Nopad(decryption.nonce);
 
     let privateKey = decryptionKey.key.private.slice(0, 32);  // The key has the private + public components.
 
@@ -314,11 +318,11 @@ async function decryptMessageContent(
 
     let decipher = await getMgs4Decipher(secretKey, headerBytes);
     let contentBytes = decodeBase64Nopad(content);
-    let outputBuffers = [];
+    let outputBuffers: (Uint8Array | null)[] = [];
     outputBuffers.push(await decipher.update(contentBytes));
     outputBuffers.push(await decipher.finalize());
-    outputBuffers = outputBuffers.filter(item=>item);  // Remove null buffers
-    let output = concatBuffers(outputBuffers);
+    outputBuffers = outputBuffers.filter((item): item is Uint8Array => !!item);
+    let output = concatBuffers(outputBuffers as Uint8Array[]);
 
     if(compressed) {
         output = pako.ungzip(output);
@@ -335,7 +339,7 @@ export function parseMessage(message: string): MilleGrillesMessage {
 
     // Copy all fields
     Object.keys(obj).forEach(key=>{
-        if(!m[key]) {
+        if(key in m && !m[key]) {
             m[key] = obj[key];
         }
     })
