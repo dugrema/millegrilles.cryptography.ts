@@ -1,6 +1,6 @@
 {
   "name": "millegrilles.cryptography.ts",
-  "version": "2026.3.1",
+  "version": "2026.7.1",
   "main": "dist/index.cjs.js",
   "module": "dist/index.es.js",
   "types": "dist/index.d.ts",
@@ -36,7 +36,7 @@
     "typescript": "^6.0.3"
   },
   "dependencies": {
-    "@dugrema/node-forge": "github:dugrema/forge#ed25519",
+    "@dugrema/node-forge": "git+https://git.maple.maceroc.com/forge.git#ed25519",
     "@peculiar/asn1-asym-key": "2.8.0",
     "@peculiar/asn1-pkcs8": "2.8.0",
     "@peculiar/asn1-schema": "2.8.0",
