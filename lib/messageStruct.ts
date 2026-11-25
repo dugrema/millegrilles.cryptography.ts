@@ -325,7 +325,13 @@ async function decryptMessageContent(
     let output = concatBuffers(outputBuffers as Uint8Array[]);
 
     if(compressed) {
-        output = pako.ungzip(output);
+        // Prevent decompression bomb attacks by limiting output size
+        const maxDecompressedSize = 10 * 1024 * 1024; // 10 MB limit
+        const decompressed = pako.ungzip(output);
+        if (decompressed.byteLength > maxDecompressedSize) {
+            throw new Error("Decompressed content exceeds maximum allowed size");
+        }
+        output = decompressed;
     }
 
     return new TextDecoder().decode(output);

@@ -102,7 +102,7 @@ export async function verifyCertificate(
       throw new Error("Invalid certificate");
     }
 
-    const basicExtensions = ca.getExtension("2.5.29.19") as BasicConstraintsExtension;
+    const basicExtensions = cert.getExtension("2.5.29.19") as BasicConstraintsExtension;
     if (basicExtensions && basicExtensions.ca === true) {
       // This is a CA cert (root, intermediary). Use current publicKey to check next certificate.
       parentKey = cert.publicKey;
@@ -406,6 +406,21 @@ export function loadPrivateKeyEd25519(
     .replace(/[\n\r]/g, "");
   let keyBytes = decodeBase64(keyString);
   let ecParams = AsnConvert.parse(keyBytes, PrivateKeyInfo);
+
+  // Validate the key length to prevent truncation attacks
+  if (ecParams.privateKey.byteLength < 32) {
+    throw new Error("Invalid private key: too short");
+  }
+
+  // Verify the algorithm OID matches Ed25519 (1.3.101.112)
+  const expectedEd25519Oid = "1.3.101.112";
+  const actualOid = ecParams.privateKeyAlgorithm.algorithm;
+  if (actualOid !== expectedEd25519Oid) {
+    throw new Error(
+      `Invalid algorithm OID for Ed25519 private key: expected ${expectedEd25519Oid}, got ${actualOid}`,
+    );
+  }
+
   let privateKey = ecParams.privateKey.slice(
     ecParams.privateKey.byteLength - 32,
   );
@@ -477,7 +492,11 @@ export class CertificateCache {
     chain: string[],
   ): Promise<CertificateWrapper | boolean> {
     if (Object.keys(this.cacheContent).length >= this.maxSize) {
-      return false; // Full
+      // Evict expired entries before rejecting
+      await this.maintain();
+      if (Object.keys(this.cacheContent).length >= this.maxSize) {
+        return false; // Still full after eviction
+      }
     }
 
     // Save the wrapper with the public key as identifier.
