@@ -325,13 +325,31 @@ async function decryptMessageContent(
     let output = concatBuffers(outputBuffers as Uint8Array[]);
 
     if(compressed) {
-        // Prevent decompression bomb attacks by limiting output size
+        // Prevent decompression bomb attacks by limiting the accumulated output
+        // size. Stream the inflate so the guard fires *before* the full plaintext
+        // is allocated, instead of after pako.ungzip has already materialised it.
         const maxDecompressedSize = 10 * 1024 * 1024; // 10 MB limit
-        const decompressed = pako.ungzip(output);
-        if (decompressed.byteLength > maxDecompressedSize) {
-            throw new Error("Decompressed content exceeds maximum allowed size");
+        const chunks: Uint8Array[] = [];
+        let total = 0;
+        let endStatus: number | undefined;
+        let endMessage: string | undefined;
+        const inflater = new pako.Inflate({ chunkSize: 64 * 1024 });
+        inflater.onData = (chunk: Uint8Array) => {
+            total += chunk.length;
+            if (total > maxDecompressedSize) {
+                throw new Error("Decompressed content exceeds maximum allowed size");
+            }
+            chunks.push(chunk);
+        };
+        inflater.onEnd = (status: number) => {
+            endStatus = status;
+            endMessage = inflater.msg;
+        };
+        inflater.push(output, true);
+        if (endStatus === undefined || endStatus !== 0) {
+            throw new Error(`Failed to decompress message content: ${endMessage ?? String(endStatus)}`);
         }
-        output = decompressed;
+        output = concatBuffers(chunks);
     }
 
     return new TextDecoder().decode(output);

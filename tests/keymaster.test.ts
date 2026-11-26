@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { DomainSignature } from "../lib/keymaster";
+import { DomainSignature, decryptKey } from "../lib/keymaster";
 
 const CA_PRIVATE_KEY = new Uint8Array(Buffer.from('01234567890123456789012345678901234567890123456789012345678901234', 'hex'));
 
@@ -29,4 +29,13 @@ test('sign domains err', async () => {
         expect(err).toBeTruthy()
     }
     
+});
+
+test('decryptKey rejects unexpected key length (L4)', async () => {
+    // 16 bytes is neither 32 (direct) nor 80 (indirect); must throw rather than
+    // silently return undefined.
+    const badKey = new Uint8Array(16);
+    await expect(decryptKey(badKey, CA_PRIVATE_KEY)).rejects.toThrow(
+        "Invalid encrypted key length",
+    );
 });

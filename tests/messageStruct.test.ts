@@ -203,3 +203,24 @@ test('deserialize message from python', async () => {
     let result = await deserializedMessage.verify();
     expect(result).toBe(true);
 })
+
+test('encrypted response decompression bomb is bounded (#8)', async () => {
+    let certificateWrapper = wrapperFromPems(CERTIFICATE_1, MILLEGRILLE_CERT);
+    let signingKey = await newMessageSigningKey(PRIVATE_KEY, certificateWrapper);
+    // Highly repetitive payload: compresses to a tiny ciphertext but inflates
+    // past the 10 MB cap, exercising the streaming decompression guard.
+    let content = { d: 'A'.repeat(11 * 1024 * 1024) };
+    let encryptionKeys = [signingKey.certificate];
+    let timestamp = new Date(1721592075000);
+    let message = await createEncryptedResponse(signingKey, encryptionKeys, content, timestamp);
+
+    // Ciphertext stays tiny even though the plaintext is >10 MB.
+    expect(message.contenu.length).toBeLessThan(1_000_000);
+
+    let privateKey = loadPrivateKeyEd25519(PRIVATE_KEY_1);
+    let decryptionKey = await newMessageSigningKey(privateKey, certificateWrapper);
+    await expect(message.getContent(decryptionKey)).rejects.toThrow(
+        "Decompressed content exceeds maximum allowed size",
+    );
+}, 30000);
+

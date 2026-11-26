@@ -91,6 +91,8 @@ export async function decryptKey(encryptedKey: string | Uint8Array, privateKey: 
     } else if(encryptedKeyBytes.length === 80) {
         // Indirect decryption
         return await decryptEd25519(encryptedKeyBytes, privateKey)
+    } else {
+        throw new Error(`Invalid encrypted key length: expected 32 or 80 bytes, got ${encryptedKeyBytes.length}`);
     }
 }
 

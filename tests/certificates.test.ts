@@ -16,7 +16,7 @@ import {
   splitKeyCertPem,
 } from "../lib/certificates";
 import { decodeBase64Url } from "../lib/multiencoding";
-import { parseMessage } from "../lib/messageStruct";
+import { parseMessage, MilleGrillesMessage } from "../lib/messageStruct";
 
 // ---------------------------------------------------------------------------
 // Dynamic certificate generation
@@ -125,6 +125,95 @@ const certs = generateTestCertificates();
 const CERTIFICATE_1 = certs.chain;
 const MILLEGRILLE_CERT = certs.caPem;
 const LEAF_PUB_KEY_HEX = certs.leafPubKeyHex;
+
+// Formats a Date as OpenSSL's [CC]YYMMDDHHMMSSZ (UTC) for -not_before/-not_after.
+function utcCompact(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, "0");
+  return (
+    String(d.getUTCFullYear()) +
+    p(d.getUTCMonth() + 1) +
+    p(d.getUTCDate()) +
+    p(d.getUTCHours()) +
+    p(d.getUTCMinutes()) +
+    p(d.getUTCSeconds()) +
+    "Z"
+  );
+}
+
+/**
+ * Mints a CA (valid now) plus a leaf certificate that is already EXPIRED
+ * (its whole validity window is in the past). Used to confirm expired chains
+ * are rejected by default and only accepted via a trusted explicit date.
+ */
+function generateExpiredLeaf(): {
+  caPem: string;
+  leafPem: string;
+  leafPubKeyHex: string;
+  expiredWindow: Date;
+} {
+  const DAY = 86400_000;
+  const now = Date.now();
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "mg-expired-"));
+  const sh = (cmd: string): string => {
+    try {
+      return execSync(`/bin/bash -c "${cmd.replace(/"/g, '\\"')}"`, {
+        encoding: "utf-8",
+      });
+    } catch (e: any) {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      throw new Error(`shell command failed: ${e.stderr || e.message}`);
+    }
+  };
+
+  const caKey = path.join(tmpDir, "ca.key");
+  const caPem = path.join(tmpDir, "ca.pem");
+  const leafKey = path.join(tmpDir, "leaf.key");
+  const leafCsr = path.join(tmpDir, "leaf.csr");
+  const leafPem = path.join(tmpDir, "leaf.pem");
+  const leafExt = path.join(tmpDir, "leaf.ext");
+
+  // CA valid from well before the leaf's (past) window through +10 years, so it
+  // both signs the leaf and itself passes a historical date-based validation.
+  sh(`openssl genpkey -algorithm ED25519 -out "${caKey}"`);
+  sh(
+    `openssl req -x509 -key "${caKey}" -out "${caPem}" ` +
+      `-not_before "${utcCompact(new Date(now - 1000 * DAY))}" ` +
+      `-not_after "${utcCompact(new Date(now + 3650 * DAY))}" ` +
+      `-subj "/CN=expired-test-CA/O=MilleGrilles" ` +
+      `-addext "basicConstraints=critical,CA:TRUE" ` +
+      `-addext "keyUsage=critical,keyCertSign,cRLSign"`,
+  );
+
+  // Leaf valid entirely in the past: [-730d, -365d], i.e. expired ~6 months ago.
+  const notBefore = new Date(now - 730 * DAY);
+  const notAfter = new Date(now - 365 * DAY);
+  sh(`openssl genpkey -algorithm ED25519 -out "${leafKey}"`);
+  sh(
+    `openssl req -new -key "${leafKey}" -out "${leafCsr}" -subj "/CN=expired-leaf/O=MilleGrilles"`,
+  );
+  fs.writeFileSync(
+    leafExt,
+    "basicConstraints=CA:FALSE\nkeyUsage=critical,digitalSignature",
+  );
+  sh(
+    `openssl x509 -req -in "${leafCsr}" -CA "${caPem}" -CAkey "${caKey}" -CAcreateserial ` +
+      `-out "${leafPem}" -extfile "${leafExt}" ` +
+      `-not_before "${utcCompact(notBefore)}" -not_after "${utcCompact(notAfter)}"`,
+  );
+
+  const leafPubKeyHex = sh(
+    `openssl x509 -in "${leafPem}" -noout -pubkey | openssl pkey -pubin -outform DER | tail -c 32 | xxd -p -c 32`,
+  ).trim();
+
+  const caPemStr = fs.readFileSync(caPem, "utf-8").trim();
+  const leafPemStr = fs.readFileSync(leafPem, "utf-8").trim();
+  fs.rmSync(tmpDir, { recursive: true, force: true });
+
+  // A moment inside the leaf's (past) validity window, for the trusted-restore path.
+  const expiredWindow = new Date((notBefore.getTime() + notAfter.getTime()) / 2);
+
+  return { caPem: caPemStr, leafPem: leafPemStr, leafPubKeyHex, expiredWindow };
+}
 
 // IDMG is computed asynchronously, so we'll set it in a beforeAll
 let EXPECTED_IDMG = '';
@@ -324,3 +413,68 @@ test("test split key/pem", () => {
   // console.debug(output2.key)
   expect((output2.key as string) + "\n").toBe(PRIVATE_2);
 })
+
+// ---------------------------------------------------------------------------
+// Security: certificate validity handling (#20 and L1)
+// ---------------------------------------------------------------------------
+
+describe("cert validity handling (#20, L1)", () => {
+  const expired = generateExpiredLeaf();
+
+  // store.verifyMessage only validates the chain + pubkey match (no message
+  // signature check), so a synthetic message with the matching pubkey is enough.
+  function messageFor(pubkey: string, pems: string[], estampille: number) {
+    const m = new MilleGrillesMessage(estampille, 0, "payload");
+    m.pubkey = pubkey;
+    m.certificat = pems;
+    return m;
+  }
+
+  test("#20 expired chain rejected by default even with backdated estampille", async () => {
+    const store = new CertificateStore(expired.caPem);
+    // Attacker backdates estampille into the expired leaf's old validity window.
+    const msg = messageFor(
+      expired.leafPubKeyHex,
+      [expired.leafPem],
+      Math.floor(expired.expiredWindow.getTime() / 1000),
+    );
+    await expect(store.verifyMessage(msg)).rejects.toThrow();
+  });
+
+  test("#20 expired chain accepted only when a trusted validateAt is supplied", async () => {
+    const store = new CertificateStore(expired.caPem);
+    const msg = messageFor(expired.leafPubKeyHex, [expired.leafPem], 0);
+    const wrapper = await store.verifyMessage(msg, {
+      validateAt: expired.expiredWindow,
+    });
+    expect(wrapper).toBeDefined();
+  });
+
+  test("#20 validateAt still enforces the validity window", async () => {
+    const store = new CertificateStore(expired.caPem);
+    const msg = messageFor(expired.leafPubKeyHex, [expired.leafPem], 0);
+    // Trusted caller passing an explicit date still cannot escape an out-of-
+    // window date; the opt-in does not mean "skip expiry".
+    await expect(
+      store.verifyMessage(msg, { validateAt: new Date(0) }),
+    ).rejects.toThrow();
+  });
+
+  test("#20 verifyMessage validates against the clock, not message.estampille", async () => {
+    const store = new CertificateStore(MILLEGRILLE_CERT);
+    // Currently-valid chain but an estampille in 1970: the old code validated
+    // against estampille (and would reject); the new code validates against now.
+    const msg = messageFor(LEAF_PUB_KEY_HEX, CERTIFICATE_1, 0);
+    const wrapper = await store.verifyMessage(msg);
+    expect(wrapper).toBeDefined();
+  });
+
+  test("L1 date:false truly skips validity checks", async () => {
+    // Expired leaf: a Date at now fails, but false skips and succeeds.
+    await expect(
+      verifyCertificatePem([expired.leafPem], expired.caPem, new Date()),
+    ).rejects.toThrow();
+    const ok = await verifyCertificatePem([expired.leafPem], expired.caPem, false);
+    expect(ok).toBe(true);
+  });
+});

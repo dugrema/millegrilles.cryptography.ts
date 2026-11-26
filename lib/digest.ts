@@ -35,10 +35,6 @@ export async function digest(value: Uint8Array, opts?: DigestOpts): Promise<stri
  * @param content Content to digest for the comparison.
  */
 export async function verifyDigest(encodedDigest: string | Uint8Array, content: Uint8Array): Promise<boolean> {
-    if (!ArrayBuffer.isView(content)) {
-        encodedDigest = new Uint8Array(content);
-    }
-
     const { name, digest: oldDigest } = multihashDecode(encodedDigest);
     const newDigest = await digestContent(content, name);
     if (!ArrayBuffer.isView(newDigest)) { throw new Error('digest: Bad response encoding type'); }  // Narrow newDigest to View

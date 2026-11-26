@@ -43,6 +43,11 @@ export const OIDS = {
   OID_DOMAIN_GRANTS,
 };
 
+// Clock-skew tolerance when checking certificate validity periods (notBefore /
+// notAfter). A small window avoids rejecting valid chains due to drift between
+// the validating host and the certificate issuer.
+const CERT_VALIDITY_SKEW_MS = 5 * 60 * 1000; // 5 minutes
+
 export async function verifyCertificatePem(
   certificatePems: string[],
   caCertPem: string,
@@ -66,12 +71,16 @@ export async function verifyCertificate(
   const caExtensions = ca.getExtension("2.5.29.19") as BasicConstraintsExtension;
   if (caExtensions && caExtensions.ca !== true) throw new Error("Invalid CA certificate");
 
-  // Determine the validation date (if any)
-  let validationDate: Date | undefined = undefined; // Date is false, no check is done on the certificate dates
-  if (date) {
+  // Determine how the certificate validity period should be checked.
+  //   Date           -> validate the chain at that specific moment
+  //   false          -> skip the validity-period checks entirely
+  //   null/undefined -> validate against the current clock
+  let validationDate: Date | undefined;
+  let skipDateCheck = false;
+  if (date instanceof Date) {
     validationDate = date;
   } else if (date === false) {
-    // Ok, no validation
+    skipDateCheck = true;
   } else if (date == null) {
     validationDate = new Date(); // Use current date
   } else {
@@ -96,6 +105,7 @@ export async function verifyCertificate(
     const result = await verifyCertficateKeys(cert, parentKey, {
       date: validationDate,
       signatureOnly: false,
+      skipDateCheck,
     });
     if (!result) {
       // console.warn("invalid certificate (result:%O), %O (parentKey: %O)", result, cert, parentKey);
@@ -127,7 +137,7 @@ let subtleModeEd25519 = true;
 async function verifyCertficateKeys(
   cert: X509Certificate,
   parentKey: PublicKey,
-  params: X509CertificateVerifyParams,
+  params: X509CertificateVerifyParams & { skipDateCheck?: boolean },
 ): Promise<boolean> {
   if (!parentKey)
     throw new Error("Missing parentKey key to validate the certificate");
@@ -168,11 +178,18 @@ async function verifyCertficateKeys(
 
   if (params.signatureOnly) {
     return ok;
+  } else if (params.skipDateCheck) {
+    // Caller explicitly opted out of validity-period checks.
+    return ok;
   } else {
-    const date = params.date || new Date();
+    const date = params.date ?? new Date();
     const time = date.getTime();
+    // Inclusive bounds plus a skew tolerance: notAfter is the last valid moment,
+    // and clocks may drift a few minutes between issuer and validator.
     return (
-      ok && cert.notBefore.getTime() < time && time < cert.notAfter.getTime()
+      ok &&
+      cert.notBefore.getTime() - CERT_VALIDITY_SKEW_MS <= time &&
+      time <= cert.notAfter.getTime() + CERT_VALIDITY_SKEW_MS
     );
   }
 }
@@ -551,11 +568,24 @@ export class CertificateStore {
     return result;
   }
 
+  // Verify a message's certificate chain.
+  //
+  // By default the chain is validated against the current clock. The message's
+  // own `estampille` is attacker-controlled on the network: without this, a
+  // holder of an expired key could backdate `estampille` into the certificate's
+  // old validity window and reactivate it (there is no CRL/OCSP here, so
+  // expiry is the only lifetime defence).
+  //
+  // `options.validateAt` lets a *trusted* caller validate against a specific
+  // historical date. It is intended only for replaying transactions from a
+  // trusted redo-log backup, where the recorded timestamp is trustworthy and
+  // a certificate valid at that moment should be accepted. Never pass a value
+  // derived from untrusted input.
   async verifyMessage(
     message: MilleGrillesMessage,
+    options?: { validateAt?: Date },
   ): Promise<CertificateWrapper> {
-    const timestamp = message.estampille;
-    const messageDate = new Date(timestamp * 1000);
+    const validateAt = options?.validateAt ?? new Date();
 
     const publicKey = message.pubkey;
     let certificateWrapper: CertificateWrapper | undefined;
@@ -587,7 +617,7 @@ export class CertificateStore {
         throw new Error("Mismatch between pubkey and attached certificate");
     }
 
-    const verifyResult = await verifyCertificate(chain, this.ca, messageDate);
+    const verifyResult = await verifyCertificate(chain, this.ca, validateAt);
     if (verifyResult && this.cache && !certificateWrapper) {
       // Save to cache - reuse wrapper if possible.
       if(message.certificat) {
