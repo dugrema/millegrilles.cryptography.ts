@@ -357,8 +357,9 @@ export async function getIdmg(ca: X509Certificate | string) {
   if (!ArrayBuffer.isView(certDigest)) throw new Error("wrong encoding");
 
   // Encode with multihash
+  // Legacy multihashes v4 code 0xb260 for blake2s-256
   let certMhDigest = getMultihashBytes(
-    "blake2s-256",
+    { code: 0xb260, length: 32 },
     new Uint8Array(certDigest),
   );
 

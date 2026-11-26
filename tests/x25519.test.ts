@@ -1,3 +1,4 @@
+import 'reflect-metadata';
 import { secretFromEd25519, secretFromEd25519PrivateX25519Peer, encryptEd25519, decryptEd25519, generateX25519KeyPair, sharedSecretFromX22519 } from '../lib/x25519';
 import { decodeBase64Nopad } from '../lib/multiencoding'
 import _sodium from 'libsodium-wrappers';

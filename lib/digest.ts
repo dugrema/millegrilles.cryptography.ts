@@ -1,9 +1,7 @@
 import { blake2b, blake2s, createBLAKE2b, createBLAKE2s } from 'hash-wasm';
-import { decodeHex, hashEncode, multihashDecode } from './multiencoding';
+import { decodeHex, hashEncode, multihashDecode, HashMeta, nameToHashMeta } from './multiencoding';
 import { IHasher } from 'hash-wasm/dist/lib/WASMInterface';
 import { multiencoding } from '.';
-import { Base, BaseName } from 'multibase';
-import { HashName } from 'multihashes';
 
 /** Options for digest(). */
 type DigestOpts = {
@@ -23,10 +21,11 @@ export async function digest(value: Uint8Array, opts?: DigestOpts): Promise<stri
 
     const digestView = await digestContent(value, digestName)
 
-    if(encoding === 'bytes') return digestView  // Return Uint8Array
+    if (encoding === 'bytes') return digestView  // Return Uint8Array
 
+    const hashMeta = nameToMeta(digestName)
     // @ts-ignore
-    return hashEncode(encoding, digestName, digestView)
+    return hashEncode(encoding, hashMeta, digestView)
 }
 
 /**
@@ -35,16 +34,16 @@ export async function digest(value: Uint8Array, opts?: DigestOpts): Promise<stri
  * @param encodedDigest The multihash encoded value to compare.
  * @param content Content to digest for the comparison.
  */
-export async function verifyDigest(encodedDigest: string | Uint8Array, content: Uint8Array) : Promise<boolean> {
-    if(!ArrayBuffer.isView(content)) {
+export async function verifyDigest(encodedDigest: string | Uint8Array, content: Uint8Array): Promise<boolean> {
+    if (!ArrayBuffer.isView(content)) {
         encodedDigest = new Uint8Array(content);
     }
 
-    const {name, digest: oldDigest} = multihashDecode(encodedDigest);
+    const { name, digest: oldDigest } = multihashDecode(encodedDigest);
     const newDigest = await digestContent(content, name);
-    if(!ArrayBuffer.isView(newDigest)) { throw new Error('digest: Bad response encoding type'); }  // Narrow newDigest to View
+    if (!ArrayBuffer.isView(newDigest)) { throw new Error('digest: Bad response encoding type'); }  // Narrow newDigest to View
 
-    if(comparerArraybuffers(oldDigest, newDigest)) {
+    if (comparerArraybuffers(oldDigest, newDigest)) {
         return true;
     } else {
         throw new Error("Digest mismatch");
@@ -54,10 +53,10 @@ export async function verifyDigest(encodedDigest: string | Uint8Array, content: 
 /**
  * @returns Digest value using the algorithm in digestName.
  * @param value Value to hash.
- * @param digestName Name of the hash function.
+ * @param digestName Internal name (e.g. 'blake2s256').
  */
 async function digestContent(value: Uint8Array, digestName: string): Promise<Uint8Array> {
-    switch(digestName.toLocaleLowerCase()) {
+    switch (digestName.toLocaleLowerCase()) {
         case 'blake2s-256':
         case 'blake2s256':
             return decodeHex(await blake2s(value));
@@ -70,46 +69,44 @@ async function digestContent(value: Uint8Array, digestName: string): Promise<Uin
 }
 
 export class WrappedHasher {
-    baseName: BaseName
-    digestName: HashName
+    baseName: string
+    hashMeta: HashMeta
     hasher: IHasher | null | undefined;
     digest: string | null | undefined;
 
-    constructor(baseName: BaseName, digestName: HashName) {
+    constructor(baseName: string, hashMeta: HashMeta) {
         this.baseName = baseName;
-        this.digestName = digestName;
+        this.hashMeta = hashMeta;
     }
 
     async init() {
-        this.hasher = await createHasher(this.digestName) || null;
+        this.hasher = await createHasher(this.hashMeta) || null;
     }
 
     update(chunk: Uint8Array) {
-        if(!this.hasher) throw new Error('Hasher not initialized (run obj.init())');
+        if (!this.hasher) throw new Error('Hasher not initialized (run obj.init())');
         this.hasher.update(chunk);
     }
 
     finalize(): string {
-        const digest = this.hasher?.digest('binary');
-        if(!digest) throw new Error("Hasher is not defined");
-        this.digest = multiencoding.hashEncode(this.baseName, this.digestName, digest);
+        const digestBytes = this.hasher?.digest('binary');
+        if (!digestBytes) throw new Error("Hasher is not defined");
+        this.digest = hashEncode(this.baseName, this.hashMeta, digestBytes);
         return this.digest;
     }
 }
 
-export async function createHasher(digestName: string): Promise<IHasher> {
+export async function createHasher(hashMeta: HashMeta): Promise<IHasher> {
     let hasher: IHasher;
-    switch(digestName.toLocaleLowerCase()) {
-        case 'blake2s-256':
-        case 'blake2s256':
+    switch (hashMeta.code) {
+        case 0xb2:  // blake2s-256
             hasher = await createBLAKE2s();
             break;
-        case 'blake2b-512':
-        case 'blake2b512':
+        case 0xb5:  // blake2b-512
             hasher = await createBLAKE2b();
             break;
         default:
-            throw new Error(`Digest ${digestName} is not supported`);
+            throw new Error(`Hash code ${hashMeta.code} is not supported`);
     }
     hasher.init();
     return hasher;
@@ -118,16 +115,19 @@ export async function createHasher(digestName: string): Promise<IHasher> {
 /**
  * Compares 2 Uint8Arrays.
  * https://stackoverflow.com/questions/21553528/how-to-test-for-equality-in-arraybuffer-dataview-and-typedarray
- * @param buf1 
- * @param buf2 
+ * @param buf1
+ * @param buf2
  * @returns True if the 2 arrays are identical in length and content.
  */
 function comparerArraybuffers(buf1: Uint8Array, buf2: Uint8Array) {
     // https://stackoverflow.com/questions/21553528/how-to-test-for-equality-in-arraybuffer-dataview-and-typedarray
     if (buf1.byteLength != buf2.byteLength) return false;
-    for (var i = 0 ; i != buf1.byteLength ; i++)
-    {
+    for (var i = 0; i != buf1.byteLength; i++) {
         if (buf1[i] != buf2[i]) return false;
     }
     return true;
+}
+
+function nameToMeta(name: string): HashMeta {
+    return nameToHashMeta(name)
 }
