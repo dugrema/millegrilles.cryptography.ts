@@ -9,7 +9,7 @@ The findings referenced below (numbers and `L#` ids) correspond to
 
 Security release addressing the 2026-11-25 automated security assessment.
 It bundles the fixes already applied on this version line with the hardening
-pass completed on 2026-11-26.
+passes completed on 2026-11-26.
 
 ### Fixed in this pass (2026-11-26)
 
@@ -28,6 +28,13 @@ pass completed on 2026-11-26.
   with a streaming `pako.Inflate` that accumulates a running byte total and
   aborts as soon as the 10 MB cap is exceeded, instead of materialising the
   entire plaintext first.
+- **[MEDIUM] `#10` `splitCertificatePems` could produce invalid PEM blocks**
+  (`lib/certificates.ts`). Replaced the `split(CERTIFICATE_END)` approach with a
+  regex anchored to `^-----BEGIN CERTIFICATE-----` at line start and matching
+  non-greedily to the END marker. Each returned block is now self-contained
+  (BEGIN and END headers preserved), text sitting between/before certificates is
+  ignored, and a stray END marker in surrounding text no longer corrupts the
+  first block.
 - **[Logic] `L1` `date: false` did not disable certificate date checks**
   (`lib/certificates.ts`, `verifyCertificate` / `verifyCertficateKeys`). The
   `false` and `undefined` cases were collapsed and fell back to the current
@@ -44,6 +51,32 @@ pass completed on 2026-11-26.
   (`lib/certificates.ts`). Resolved as part of the `#20` work: validity bounds
   are now inclusive (`<=`) so a certificate valid exactly at `notAfter` is
   accepted, alongside the added skew tolerance.
+- **[LOW] `#16` Duplicate `reflect-metadata` import** (`lib/messageStruct.ts`).
+  Removed the redundant side-effect import. `lib/index.ts` already imports it
+  and no decorators or reflection APIs are used, so it served no purpose and
+  only pulled the polyfill in when `messageStruct` was loaded directly.
+- **[LOW] `#18` `MilleGrillesMessage` constructor did not validate required
+  fields** (`lib/messageStruct.ts`). The constructor now rejects a missing /
+  non-numeric / `NaN` `estampille`, an out-of-range `kind`, and an empty
+  `contenu` (type-based, so a legitimate epoch-0 stamp or `Document` kind 0 is
+  still accepted). Since `parseMessage` builds through the constructor,
+  malformed input now fails loudly instead of producing an invalid message.
+
+### Tests
+
+- Added an expired-leaf fixture generator (`tests/certificates.test.ts`) and
+  tests covering `#20` (default rejection, trusted `validateAt` acceptance,
+  out-of-window rejection, wall-clock-not-estampille) and `L1` (`date: false`
+  truly skips).
+- Added a `splitCertificatePems` suite (`tests/certificates.test.ts`) for `#10`
+  (single/multiple blocks, leading prose with a stray END marker, round-trip
+  parseability, empty input).
+- Added a streaming decompression-bomb test (`tests/messageStruct.test.ts`).
+- Added a `decryptKey` unexpected-length rejection test
+  (`tests/keymaster.test.ts`).
+- Added a `MilleGrillesMessage` constructor-validation suite
+  (`tests/messageStruct.test.ts`) for `#18` (missing/wrong-typed fields,
+  legitimate zero values, malformed `parseMessage` inputs).
 
 ### Previously applied on this version line (from the 2026-11-25 audit)
 
@@ -68,16 +101,6 @@ pass completed on 2026-11-26.
   implementation supporting legacy and modern hash codes; decoding accepts both
   regardless of mode.
 
-### Tests
-
-- Added an expired-leaf fixture generator (`tests/certificates.test.ts`) and
-  tests covering `#20` (default rejection, trusted `validateAt` acceptance,
-  out-of-window rejection, wall-clock-not-estampille) and `L1` (`date: false`
-  truly skips).
-- Added a streaming decompression-bomb test (`tests/messageStruct.test.ts`).
-- Added a `decryptKey` unexpected-length rejection test
-  (`tests/keymaster.test.ts`).
-
 ### Known open items (not addressed in this release)
 
 - `#4` Private `@dugrema/node-forge` Git-fork dependency (audit upstream).
@@ -85,5 +108,4 @@ pass completed on 2026-11-26.
 - `N2` Breaking API changes (`createHasher`, `WrappedHasher`, `domaines`,
   `cleSecrete`) - keep deprecated aliases under a major version bump.
 - `L3` Non-constant-time digest comparison, `L6` `pathLenConstraint` not
-  enforced, `#11` 20-year CA validity, `#13` password support not implemented,
-  `#18` constructor field validation.
+  enforced, `#11` 20-year CA validity, `#13` password support not implemented.

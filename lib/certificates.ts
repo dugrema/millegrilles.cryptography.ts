@@ -400,13 +400,22 @@ function _idmgExpirationTo32Uint(notAfter: Date): Uint8Array {
   return new Uint8Array(bufferExpiration);
 }
 
-const CERTIFICATE_END = "-----END CERTIFICATE-----";
+// Full certificate PEM block. The BEGIN marker is anchored to a line start and
+// the body is matched non-greedily, so text sitting between blocks (or before
+// the first one) is dropped, the BEGIN header is always preserved, and a marker
+// that happens to appear inside a block cannot split it in half.
+const CERTIFICATE_PEM_BLOCK_RE =
+  /^-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/gm;
 
+/**
+ * Split a concatenated PEM string into individual certificate blocks.
+ * Each returned block is self-contained: it includes both the BEGIN and END
+ * headers, so callers can parse every element on its own.
+ * @param pems PEM string holding one or more certificates.
+ * @returns One string per certificate; empty array if none are found.
+ */
 export function splitCertificatePems(pems: string) {
-  return pems
-    .split(CERTIFICATE_END)
-    .filter((item) => item) // Remove empty elements
-    .map((item) => item + CERTIFICATE_END); // Put the END block back
+  return pems.match(CERTIFICATE_PEM_BLOCK_RE) ?? [];
 }
 
 const KEY_BEGIN = "-----BEGIN PRIVATE KEY-----";

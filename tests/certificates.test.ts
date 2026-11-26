@@ -14,6 +14,7 @@ import {
   CertificateCache,
   generateCsr,
   splitKeyCertPem,
+  splitCertificatePems,
 } from "../lib/certificates";
 import { decodeBase64Url } from "../lib/multiencoding";
 import { parseMessage, MilleGrillesMessage } from "../lib/messageStruct";
@@ -476,5 +477,52 @@ describe("cert validity handling (#20, L1)", () => {
     ).rejects.toThrow();
     const ok = await verifyCertificatePem([expired.leafPem], expired.caPem, false);
     expect(ok).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Security: PEM splitting preserves complete certificate blocks (#10)
+// ---------------------------------------------------------------------------
+
+describe("splitCertificatePems (#10)", () => {
+  const joined = CERTIFICATE_1.join("\n");
+
+  test("single PEM returns one intact block", () => {
+    const blocks = splitCertificatePems(CERTIFICATE_1[0]);
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]).toBe(CERTIFICATE_1[0]);
+  });
+
+  test("multiple PEMs split into self-contained blocks (BEGIN preserved)", () => {
+    const blocks = splitCertificatePems(joined);
+    expect(blocks).toHaveLength(2);
+    // Every block carries both headers, so each is parseable on its own.
+    for (const block of blocks) {
+      expect(block.startsWith("-----BEGIN CERTIFICATE-----")).toBe(true);
+      expect(block.endsWith("-----END CERTIFICATE-----")).toBe(true);
+    }
+    expect(blocks).toEqual(CERTIFICATE_1);
+  });
+
+  test("surrounding prose and a stray END marker do not corrupt blocks", () => {
+    // Leading text (including an END marker mentioned in prose) must not turn
+    // the first block into a malformed fragment.
+    const messy =
+      "Here is the chain (a block ends with -----END CERTIFICATE-----):\n" +
+      joined +
+      "\n-- end of transmission --\n";
+    const blocks = splitCertificatePems(messy);
+    expect(blocks).toEqual(CERTIFICATE_1);
+  });
+
+  test("split blocks are parseable by the certificate wrapper", () => {
+    const blocks = splitCertificatePems(joined);
+    const wrapper = wrapperFromPems(blocks);
+    expect(wrapper.getPublicKey()).toBe(LEAF_PUB_KEY_HEX);
+  });
+
+  test("empty input yields an empty array", () => {
+    expect(splitCertificatePems("")).toEqual([]);
+    expect(splitCertificatePems("no certificates here")).toEqual([]);
   });
 });

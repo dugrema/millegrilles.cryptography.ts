@@ -1,4 +1,3 @@
-import "reflect-metadata";
 import stringify from 'json-stable-stringify';
 import pako from 'pako';
 
@@ -56,6 +55,18 @@ export class MilleGrillesMessage {
     [key: string]: any;
 
     constructor(estampille: number, kind: MessageKind, contenu: string) {
+        // Reject malformed messages at construction instead of letting them
+        // circulate in an invalid state (kind 0 / estampille 0 are valid values,
+        // so these check the type rather than simple truthiness).
+        if (typeof estampille !== 'number' || Number.isNaN(estampille)) {
+            throw new Error("estampille must be a number");
+        }
+        if (typeof kind !== 'number' || MessageKind[kind] === undefined) {
+            throw new Error("kind must be a valid MessageKind");
+        }
+        if (typeof contenu !== 'string' || contenu.length === 0) {
+            throw new Error("contenu must be a non-empty string");
+        }
         this.estampille = estampille;
         this.kind = kind;
         this.contenu = contenu;

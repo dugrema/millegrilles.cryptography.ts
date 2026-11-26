@@ -224,3 +224,39 @@ test('encrypted response decompression bomb is bounded (#8)', async () => {
     );
 }, 30000);
 
+describe("MilleGrillesMessage constructor validation (#18)", () => {
+    test("rejects missing / wrong-typed required fields", () => {
+        expect(() => new MilleGrillesMessage(1721592075, MessageKind.Document, "")).toThrow(
+            "contenu must be a non-empty string",
+        );
+        expect(() => new MilleGrillesMessage(undefined as any, MessageKind.Document, "x")).toThrow(
+            "estampille must be a number",
+        );
+        expect(() => new MilleGrillesMessage(NaN, MessageKind.Document, "x")).toThrow(
+            "estampille must be a number",
+        );
+        expect(() => new MilleGrillesMessage(1721592075, "Document" as any, "x")).toThrow(
+            "kind must be a valid MessageKind",
+        );
+        expect(() => new MilleGrillesMessage(1721592075, 999 as MessageKind, "x")).toThrow(
+            "kind must be a valid MessageKind",
+        );
+    });
+
+    test("accepts legitimate zero-valued stamp and kind", () => {
+        // epoch 0 / kind 0 (Document) are valid, not falsy-rejected.
+        const message = new MilleGrillesMessage(0, MessageKind.Document, "payload");
+        expect(message.estampille).toBe(0);
+        expect(message.kind).toBe(MessageKind.Document);
+        expect(message.contenu).toBe("payload");
+    });
+
+    test("parseMessage fails loudly on malformed input instead of building an invalid message", () => {
+        expect(() => parseMessage("{}")).toThrow();
+        expect(() => parseMessage('{"kind": 1}')).toThrow("estampille must be a number");
+        expect(() => parseMessage('{"estampille": 1721592075, "kind": 1}')).toThrow(
+            "contenu must be a non-empty string",
+        );
+    });
+});
+
