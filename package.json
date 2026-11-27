@@ -36,11 +36,11 @@
     "typescript": "^6.0.3"
   },
   "dependencies": {
-    "@dugrema/node-forge": "git+https://git.maple.maceroc.com/forge.git#ed25519",
-    "@peculiar/asn1-asym-key": "2.8.0",
-    "@peculiar/asn1-pkcs8": "2.8.0",
-    "@peculiar/asn1-schema": "2.8.0",
-    "@peculiar/asn1-x509": "2.8.0",
+    "@peculiar/asn1-asym-key": "2.11.1",
+    "@peculiar/asn1-csr": "2.11.1",
+    "@peculiar/asn1-pkcs8": "2.11.1",
+    "@peculiar/asn1-schema": "2.11.1",
+    "@peculiar/asn1-x509": "2.11.1",
     "@peculiar/webcrypto": "1.7.1",
     "@peculiar/x509": "2.0.0",
     "@rollup/plugin-babel": "^7.1.0",

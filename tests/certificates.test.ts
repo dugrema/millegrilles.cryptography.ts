@@ -13,10 +13,12 @@ import {
   CertificateStore,
   CertificateCache,
   generateCsr,
+  verifyCsr,
   splitKeyCertPem,
   splitCertificatePems,
 } from "../lib/certificates";
-import { decodeBase64Url } from "../lib/multiencoding";
+import { generateKeypairEd5519 } from "../lib/ed25519";
+import { decodeBase64Url, encodeHex } from "../lib/multiencoding";
 import { parseMessage, MilleGrillesMessage } from "../lib/messageStruct";
 
 // ---------------------------------------------------------------------------
@@ -331,7 +333,7 @@ test("cert-getIdmg", async () => {
 });
 
 test("private key load", async () => {
-  let key = loadPrivateKeyEd25519(PRIVATE_1);
+  let key = await loadPrivateKeyEd25519(PRIVATE_1);
   expect((Buffer as any).from(key)).toStrictEqual(
   (Buffer as any).from(
       "ec646c53acd0bae30ddbad3485e1238e5f244ed20cc9b30070790e88a1979136",
@@ -388,14 +390,61 @@ test("test store message", async () => {
   // expect(wrapperVerify2).toBe(wrapperVerify1);  // Checks that we got the same object back with toBe.
 });
 
+// CSR produced by the old node-forge fork: Ed25519, CN=tata12, no extensions.
+const FORGE_CSR_PEM = `-----BEGIN CERTIFICATE REQUEST-----
+MIGQMEQCAQAwETEPMA0GA1UEAxMGdGF0YTEyMCowBQYDK2VwAyEAFgJht7oBV33G
+U6r9f2T0dFIWBEzpFuaujOyBFMPutQCgADAFBgMrZXADQQDo03USNpkEPnx/Mp5i
+GeJe88teA3NtqDVdpey6ztO+KTNJR9hMhHnXC9YupGJsaVFDAYrrrPwtW+QFEq15
+ObsE
+-----END CERTIFICATE REQUEST-----`;
+
 test("test generate CSR", async () => {
-  // @peculiar/x509's Pkcs10CertificateRequestGenerator does not support Ed25519.
-  // It throws: "Cannot get schema for 'CertificationRequestInfo' target"
-  // If this ever starts working, the test will fail — signaling we should
-  // update it to verify the newly-supported behavior.
-  await expect(generateCsr("testUser", "zABCD1234")).rejects.toThrow(
-    "Cannot get schema for 'CertificationRequestInfo' target",
+  const result = await generateCsr("testUser", "zABCD1234");
+  const { csr, privateKeyPem, privateKey, publicKey } = result;
+
+  expect(csr).toContain("-----BEGIN CERTIFICATE REQUEST-----");
+  expect(privateKeyPem).toContain("-----BEGIN PRIVATE KEY-----");
+  expect(privateKey.length).toBe(32);
+  expect(publicKey.length).toBe(32);
+
+  // The CSR must be self-consistent: its signature validates, and its public key
+  // must be the one derived from the private key we handed back.
+  const verified = await verifyCsr(csr);
+  expect(verified.commonName).toBe("testUser");
+  expect(verified.userId).toBe("zABCD1234");
+  expect(verified.publicKeyHex).toBe(encodeHex(publicKey));
+  expect(encodeHex((await generateKeypairEd5519(privateKey)).public)).toBe(
+    verified.publicKeyHex,
   );
+
+  // Same key material through the PEM, which is what consumers persist.
+  expect(encodeHex(await loadPrivateKeyEd25519(privateKeyPem))).toBe(
+    encodeHex(privateKey),
+  );
+});
+
+test("test generate CSR without a userId", async () => {
+  const verified = await verifyCsr((await generateCsr("soloUser")).csr);
+  expect(verified.commonName).toBe("soloUser");
+  expect(verified.userId).toBeUndefined();
+});
+
+test("verify a CSR written by another tool", async () => {
+  const verified = await verifyCsr(FORGE_CSR_PEM);
+  expect(verified.commonName).toBe("tata12");
+  expect(verified.userId).toBeUndefined();
+});
+
+test("reject a tampered CSR", async () => {
+  const { csr } = await generateCsr("testUser", "zABCD1234");
+  const lines = csr.split("\n");
+  // Flip one bit in the middle of the base64 body: this corrupts the CSR's
+  // self-signature (or the structure itself), and either way must not verify.
+  const bodyIndex = lines.length - 2;
+  const mutated = "A" === lines[bodyIndex][10] ? "B" : "A";
+  lines[bodyIndex] =
+    lines[bodyIndex].substring(0, 10) + mutated + lines[bodyIndex].substring(11);
+  await expect(verifyCsr(lines.join("\n"))).rejects.toThrow();
 });
 
 test("test split key/pem", () => {

@@ -30,7 +30,7 @@ The only critical candidate in the original automated review -- the deterministi
 
 ## HIGH
 
-### 4. `@dugrema/node-forge` fork from a private Git repository (`package.json:39`)
+### 4. `@dugrema/node-forge` fork from a private Git repository (`package.json:39`) — **RESOLVED**
 
 ```
 "@dugrema/node-forge": "git+https://git.maple.maceroc.com/forge.git#ed25519"
@@ -43,6 +43,14 @@ Using a private, non-NPM fork as a direct dependency means:
 - Node-forge itself has had multiple past CVEs (e.g., CVE-2022-24771 signature verification bypass); even if patched in this fork, there's no way to verify
 
 **Recommendation**: Audit the fork's diff against upstream node-forge, and track it for security patches. Consider upstreaming changes.
+
+**Resolution (2026-11-27)**: the dependency and the fork's code paths were **removed**
+rather than audited. `lib/forgeCsr.ts`, `lib/forgePrivateKey.ts` and `lib/forge.d.ts`
+are gone; CSR generation/verification and encrypted private key loading now run on
+`@peculiar/x509` + WebCrypto (`lib/pkcs8.ts`, `certificates.generateCsr` /
+`certificates.verifyCsr` / `certificates.loadPrivateKeyEd25519`). No node-forge code or
+transitive dependency remains in `package.json` or the built bundle.
+Consumer apps need a small call-site change; see `docs/migration-notes.md`.
 
 ---
 
@@ -64,7 +72,7 @@ The function returns `true` on match but throws on mismatch, making it asymmetri
 
 ---
 
-### 11. `generateMilleGrilleCertificate` uses 20-year validity (`lib/forgePrivateKey.ts:57`)
+### 11. `generateMilleGrilleCertificate` uses 20-year validity (`lib/forgePrivateKey.ts:57`) — **RESOLVED**
 
 ```ts
 cert.validity.notAfter.setFullYear(cert.validity.notBefore.getFullYear() + 20);
@@ -73,6 +81,12 @@ cert.validity.notAfter.setFullYear(cert.validity.notBefore.getFullYear() + 20);
 A 20-year CA certificate validity is extremely long by modern standards. CA certificates are typically 5-10 years. This increases the attack window if the CA private key is compromised.
 
 **Recommendation**: Reduce CA certificate validity to 5-10 years.
+
+**Resolution (2026-11-27)**: the CA issuance helpers were **deleted** (`generateMilleGrilleCertificate`,
+`generateIntermediateCertificate`, `generateNewPrivateKeyPem`) — no caller in the
+ecosystem used them, and a library shipping self-signed CA creation with a hard-coded
+20-year validity is the wrong home for that code. Certificate issuance belongs to the CA
+service / an operator using `step-ca` or `openssl`.
 
 ---
 
@@ -88,13 +102,21 @@ Console statements in production code can leak information and should be replace
 
 ---
 
-### 13. `savePrivateKeyEd25519` and `loadPrivateKeyEd25519` don't support encryption (`lib/certificates.ts:401,422`)
+### 13. `savePrivateKeyEd25519` and `loadPrivateKeyEd25519` don't support encryption (`lib/certificates.ts:401,422`) — **RESOLVED**
 
 ```ts
 if(password) throw new Error("not implemented");
 ```
 
 The "not implemented" error is clear, but it's worth noting that the public API suggests password support exists.
+
+**Resolution (2026-11-27)**: `loadPrivateKeyEd25519(pem, password?)` now actually decrypts
+PBES2 / PBKDF2 / AES-CBC encrypted PKCS#8 keys via WebCrypto (`lib/pkcs8.ts`), with the
+password read as UTF-8 and every unsupported scheme (DES, 3DES, RC2, PBES1, SHA-224 PRF)
+rejected explicitly. `savePrivateKeyEd25519` still refuses a password, and now says what
+to use instead (`openssl pkcs8 -topk8 -cipher AES-256-CBC`): key encryption is a policy
+decision with parameters (PRF, iteration count) that should not be baked into a library
+default.
 
 ---
 
@@ -187,16 +209,16 @@ So there is no `(key, nonce)` reuse across encryptions and two messages never pr
 | 1 | INFO | **Reclassified** (was CRITICAL) | Reclassified | `lib/x25519.ts:96-112` | Deterministic ChaCha20 nonce -- false positive, fresh ephemeral per call |
 | 2 | HIGH | **Resolved** | Resolved | `lib/certificates.ts:105` | Certificate chain verification uses wrong cert |
 | 3 | HIGH | **Resolved** | Resolved | `lib/certificates.ts:412` | No bounds check on ASN.1 key parsing |
-| 4 | HIGH | Open | Security | `package.json:39` | Private Git fork dependency, no audit trail |
+| 4 | HIGH | **Resolved** | Resolved | `package.json:39` | Private Git fork dependency removed entirely; CSR + encrypted key handling moved to `@peculiar/x509` + WebCrypto |
 | 5 | HIGH | **Resolved** | Resolved | `lib/certificates.ts:419` | Algorithm OID not validated for private key |
 | 6 | MEDIUM | Open | Security | `lib/digest.ts:49` | `verifyDigest` throws instead of returning false |
 | 7 | MEDIUM | **Resolved** | Resolved | `lib/certificates.ts:495-501` | Cache never evicts when full |
 | 8 | MEDIUM | **Resolved** | Resolved | `lib/messageStruct.ts` | Decompression bomb: streaming decompression with running byte cap |
 | 9 | MEDIUM | **Resolved** | Resolved | `lib/multiencoding.ts` | Deprecated `multihashes`/`multibase` packages removed (see N1) |
 | 10 | MEDIUM | **Resolved** | Resolved | `lib/certificates.ts` | PEM splitting now uses a block regex preserving BEGIN headers |
-| 11 | MEDIUM | Open | Security | `lib/forgePrivateKey.ts:57` | 20-year CA certificate validity |
+| 11 | MEDIUM | **Resolved** | Resolved | `lib/forgePrivateKey.ts` (deleted) | 20-year CA validity: CA issuance helpers deleted, no replacement |
 | 12 | LOW | Open | Security | `lib/certificates.ts:149` | `console.info` in production code |
-| 13 | LOW | Open | Security | `lib/certificates.ts:402,438` | Password support marked "not implemented" |
+| 13 | LOW | **Resolved** | Resolved | `lib/certificates.ts`, `lib/pkcs8.ts` | Encrypted PKCS#8 loading implemented (PBES2/PBKDF2/AES-CBC); saving still refuses a password, with a message pointing at `openssl pkcs8` |
 | 14 | LOW | Open | Security | `lib/keymaster.ts:17` | French spelling inconsistency (`domaines`) |
 | 15 | LOW | Open | Security | `lib/keymaster.ts:104,115` | Typo in property name (`cleSecrete`) |
 | 16 | LOW | **Resolved** | Resolved | `lib/messageStruct.ts` | Duplicate `reflect-metadata` import removed |
@@ -290,15 +312,23 @@ Switch mode at runtime: `setHashEncodingMode('modern')` for new hash generation,
 3. **`L1`, `L2`, `L4`** (and `#17`, folded into `#20`) -- logic fixes landed.
 4. **Follow-up pass** -- **`#10`** (PEM splitting now uses a block regex preserving BEGIN headers), **`#16`** (duplicate `reflect-metadata` import removed) and **`#18`** (`MilleGrillesMessage` constructor validates required fields) landed. All 65 tests pass, typecheck and build clean.
 
+### Completed in the 2026-11-27 pass (unreleased)
+
+1. **`#4`** -- the private `@dugrema/node-forge` fork and every file that used it are gone; CSR generation/verification and encrypted PKCS#8 loading now run on `@peculiar/x509` + WebCrypto.
+2. **`#11`** -- the CA issuance helpers were deleted rather than re-tuned.
+3. **`#13`** -- encrypted private key loading implemented (`lib/pkcs8.ts`), with every scheme SubtleCrypto cannot decrypt rejected explicitly.
+
+79 tests pass; `tsc --noEmit`, `npm run build` and `npm pack --dry-run` clean. Consumer-app rewrites are documented in `docs/migration-notes.md`.
+
 ### Remaining priorities
 
 1. **Resolve `N1`** -- the `multiformats` dependency looks unused; confirm intent or drop it as part of the #9 rework.
 2. **Document `N2`** -- keep deprecated aliases for `createHasher` / `WrappedHasher` / `domaines` / `cleSecrete` and ship under a major bump with a migration note.
-3. **Audit the private `@dugrema/node-forge` fork (#4)** against upstream node-forge for known CVEs.
+3. ~~**Audit the private `@dugrema/node-forge` fork (#4)** against upstream node-forge for known CVEs.~~ -- Superseded: the fork was removed outright (see the `#4` resolution).
 4. **Add the deferred code comment for `#1`** so the ephemeral-derived-nonce design is recorded and not re-raised.
 5. **Tighten `L5`** (decode validation); `L3` (constant-time compare) and `L6` (`pathLenConstraint`) are lower urgency.
 
 ### Notes on remaining out-of-scope items
 
-- `#11` (20-year CA) and `#13` (password not implemented) are accepted as documented limitations and need no action right now.
+- ~~`#11` (20-year CA) and `#13` (password not implemented) are accepted as documented limitations and need no action right now.~~ Both were closed in the 2026-11-27 pass: the CA helpers were deleted and encrypted key loading was implemented.
 - Open MEDIUM `#6` (`verifyDigest` throw-vs-`false`, deferred for API-transition reasons) and the remaining open LOWs (`#12`, `#14`, `#15`, `#19`) stay as logged in the Summary Table. (`#10` and `#18`, previously listed here, were resolved in the follow-up pass.)

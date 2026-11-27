@@ -5,6 +5,68 @@ All notable changes to **millegrilles.cryptographie.ts** are documented in this 
 The findings referenced below (numbers and `L#` ids) correspond to
 `docs/security_assessment_2026-11-25.md`.
 
+## [Unreleased]
+
+### Removed
+- **`@dugrema/node-forge`**, the private Git-fork dependency, is gone (`package.json`),
+  along with the `forgeCsr` and `forgePrivateKey` namespaces (`lib/forgeCsr.ts`,
+  `lib/forgePrivateKey.ts`, `lib/forge.d.ts`). This closes `#4` (no audit trail, no
+  registry patch tracking, build breaks if the private Git host is unavailable).
+  **Breaking change** for consumers — see `docs/migration-notes.md` for the exact
+  call-site rewrites in `millegrilles.authentication.typescript` and
+  `millegrilles.coupdoeil.react`.
+- `forgePrivateKey.generateNewPrivateKeyPem`, `generateMilleGrilleCertificate` and
+  `generateIntermediateCertificate` are removed with no replacement. They were CA
+  issuance helpers with a hard-coded 20-year certificate validity (`#11`) and had no
+  caller left in the ecosystem; issue certificates with a real CA instead.
+
+### Added
+- **Encrypted PKCS#8 private keys are now supported** (`#13`). `loadPrivateKeyEd25519`
+  decrypts `ENCRYPTED PRIVATE KEY` blocks written by OpenSSL, python-cryptography and the
+  old node-forge fork: PBES2 / PBKDF2 (HMAC-SHA1, SHA-256, SHA-384, SHA-512) with
+  AES-128/192/256-CBC, using WebCrypto so it works in Node and in browsers. DES, 3DES,
+  PBES1 and other non-decryptable schemes are rejected with an explicit error rather than
+  silently failing. Passwords are decoded as UTF-8.
+  - New internal module `lib/pkcs8.ts` with a bounded DER reader: indefinite lengths,
+    non-minimal length encodings, multi-byte tags, truncated elements, negative
+    iteration counts, absurd PEM sizes and runaway PBKDF2 iteration counts are all
+    rejected before any crypto is performed.
+- `certificates.loadPrivateKeyPem(pem, password?)` — decrypts to a plain PKCS#8 PEM.
+- `certificates.isEncryptedPrivateKeyPem(pem)` — tells a caller whether a password is
+  required without trying to load the key.
+- `certificates.verifyCsr(pem)` — replaces `forgeCsr.verifyUserCsr`. Verifies the Ed25519
+  self-signature (SubtleCrypto with a libsodium fallback, like certificate verification),
+  rejects CSRs not signed with Ed25519, and returns
+  `{ commonName, userId?, publicKeyHex }`.
+- `ed25519.loadSigningKeyFromPems(..., password?)` accepts an optional password so an
+  encrypted signing key can be loaded in one call.
+
+### Changed
+- **Breaking**: `loadPrivateKeyEd25519` is now `async` and returns `Promise<Uint8Array>`.
+  Call sites that pass an unencrypted key keep working once they `await`.
+- **Breaking**: `generateCsr` returns `csr` instead of `pem`, and now also returns
+  `privateKeyPem`, `privateKey` (32-byte seed), `publicKey` and `keys` (the generated
+  `CryptoKeyPair`), so a CSR + keypair can be created without the removed forge helpers.
+  Keys it writes are standard RFC 8410 PKCS#8 (`openssl pkey` can read them), unlike the
+  non-standard shape the fork emitted; both shapes still *load*.
+- `getCommonName()`, `extractMillegrillesExtensions()` and `verifyCsr()` read the
+  **first** CN (`getField("CN")[0]`) instead of the last (`.pop()`).
+- `savePrivateKeyEd25519(key, password)` still refuses to encrypt — it says so in terms of
+  what to use instead, rather than saying "not implemented".
+- Pinned `@peculiar/asn1-asym-key`, `@peculiar/asn1-pkcs8`, `@peculiar/asn1-schema` and
+  `@peculiar/asn1-x509` to `2.11.1`, and added `@peculiar/asn1-csr@2.11.1` as a direct
+  dependency. The previous mix resolved to two copies of `@peculiar/asn1-schema`, which
+  made every `@peculiar/x509` CSR parse and generate call fail with
+  `Cannot get schema for 'CertificationRequestInfo' target`.
+
+### Tests
+- `tests/privateKey.test.ts`: OpenSSL (AES-256-CBC, HMAC-SHA256, UTF-8 password),
+  OpenSSL (AES-128-CBC, PRF field absent → HMAC-SHA1 default), node-forge legacy
+  (HMAC-SHA512), wrong password, missing password, truncated DER, 3DES and PBES1
+  rejection, non-Ed25519 key rejection, save/load round-trip.
+- CSR generation is now asserted to *work*, plus verification of a CSR produced by
+  another tool and rejection of a tampered one.
+
 ## [2026.8.1] - 2026-11-26
 
 Security release addressing the 2026-11-25 automated security assessment.

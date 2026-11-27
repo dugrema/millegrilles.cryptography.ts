@@ -2,6 +2,7 @@ import {
   BasicConstraintsExtension,
   X509Certificate,
   Extension,
+  Pkcs10CertificateRequest,
   Pkcs10CertificateRequestGenerator,
   KeyUsagesExtension,
   KeyUsageFlags,
@@ -17,14 +18,18 @@ import {
 } from "./multiencoding";
 import { digest } from "./digest";
 import { AsnConvert, OctetString } from "@peculiar/asn1-schema";
+import { CertificationRequest } from "@peculiar/asn1-csr";
 import { PrivateKeyInfo } from "@peculiar/asn1-asym-key";
 import { AlgorithmIdentifier, Certificate } from "@peculiar/asn1-x509";
 import {
   PrivateKey as PrivateKeyPkcs8,
   PrivateKeyInfo as PrivateKeyInfoPkcs8,
 } from "@peculiar/asn1-pkcs8";
+import { decryptPrivateKeyPem, isEncryptedPrivateKeyPem } from "./pkcs8";
 import { MilleGrillesMessage } from "./messageStruct";
 import { verifyMessageSignature } from "./ed25519";
+
+export { isEncryptedPrivateKeyPem };
 
 // Custom x509v3 OID extensions for MilleGrille certificates
 const OID_EXCHANGES = "1.2.3.4.0";
@@ -295,7 +300,8 @@ export class CertificateWrapper {
 
   getCommonName(): string {
     const subject = this.certificate.subjectName;
-    const cnField = subject.getField("CN").pop();
+    // RelativeName order is significant; the first CN is the subject name.
+    const cnField = subject.getField("CN")[0];
     return cnField ?? "";
   }
 }
@@ -322,7 +328,7 @@ function extractMillegrillesExtensions(
   );
 
   // Make availble for times when the certificate is transferred as a proxy (comlink).
-  const commonName = certificate.subjectName.getField("CN").pop();
+  const commonName = certificate.subjectName.getField("CN")[0];
 
   const extensions: MilleGrillesCertificateExtensions = {
     exchanges,
@@ -421,37 +427,86 @@ export function splitCertificatePems(pems: string) {
 const KEY_BEGIN = "-----BEGIN PRIVATE KEY-----";
 const KEY_END = "-----END PRIVATE KEY-----";
 
-export function loadPrivateKeyEd25519(
+const OID_ED25519 = "1.3.101.112";
+
+/**
+ * Load an Ed25519 private key from a PKCS#8 PEM. Password-protected
+ * `ENCRYPTED PRIVATE KEY` blocks (PBES2) are decrypted first.
+ * @param pem PKCS#8 private key PEM, plain or encrypted.
+ * @param password Password of an encrypted key. Ignored when the key is plain.
+ * @returns The 32-byte Ed25519 private key seed.
+ */
+export async function loadPrivateKeyEd25519(
   pem: string,
   password?: string,
-): Uint8Array {
-  if (password) throw new Error("not implemented");
+): Promise<Uint8Array> {
+  return extractEd25519Seed(await privateKeyDer(pem, password));
+}
 
-  let keyString = pem
+/**
+ * Same as `loadPrivateKeyEd25519`, returning the plain (unencrypted) PKCS#8 PEM
+ * instead of the raw seed.
+ */
+export async function loadPrivateKeyPem(
+  pem: string,
+  password?: string,
+): Promise<string> {
+  return derToPrivateKeyPem(await privateKeyDer(pem, password));
+}
+
+function derToPrivateKeyPem(der: Uint8Array): string {
+  return [KEY_BEGIN, encodeBase64(der), KEY_END].join("\n");
+}
+
+async function privateKeyDer(
+  pem: string,
+  password?: string,
+): Promise<Uint8Array> {
+  if (isEncryptedPrivateKeyPem(pem)) {
+    if (!password)
+      throw new Error("The private key is encrypted, a password is required");
+    return await decryptPrivateKeyPem(pem, password);
+  }
+
+  // Unencrypted keyfile: the password, if any, is meaningless and ignored.
+  const keyString = pem
     .replace(KEY_BEGIN, "")
     .replace(KEY_END, "")
     .replace(/[\n\r]/g, "");
-  let keyBytes = decodeBase64(keyString);
-  let ecParams = AsnConvert.parse(keyBytes, PrivateKeyInfo);
+  return decodeBase64(keyString);
+}
 
-  // Validate the key length to prevent truncation attacks
-  if (ecParams.privateKey.byteLength < 32) {
-    throw new Error("Invalid private key: too short");
-  }
+function extractEd25519Seed(der: Uint8Array): Uint8Array {
+  const ecParams = AsnConvert.parse(der, PrivateKeyInfo);
 
-  // Verify the algorithm OID matches Ed25519 (1.3.101.112)
-  const expectedEd25519Oid = "1.3.101.112";
-  const actualOid = ecParams.privateKeyAlgorithm.algorithm;
-  if (actualOid !== expectedEd25519Oid) {
+  // Reject a non-Ed25519 key before touching its key material.
+  if (ecParams.privateKeyAlgorithm.algorithm !== OID_ED25519) {
     throw new Error(
-      `Invalid algorithm OID for Ed25519 private key: expected ${expectedEd25519Oid}, got ${actualOid}`,
+      `Invalid algorithm OID for Ed25519 private key: expected ${OID_ED25519}, got ${ecParams.privateKeyAlgorithm.algorithm}`,
     );
   }
 
-  let privateKey = ecParams.privateKey.slice(
-    ecParams.privateKey.byteLength - 32,
-  );
-  return new Uint8Array(privateKey);
+  const privateKey = new Uint8Array(ecParams.privateKey);
+
+  // Validate the key length to prevent truncation attacks
+  if (privateKey.length < 32) {
+    throw new Error("Invalid private key: too short");
+  }
+
+  let seed: Uint8Array;
+  if (privateKey[0] === 0x04 && privateKey[1] === 0x20 && privateKey.length >= 34) {
+    // RFC 8410 wraps the seed in a nested OCTET STRING (04 20 <32 bytes>). The old
+    // node-forge fork additionally appended the public key after it, so the nested
+    // value has to be read explicitly instead of slicing the tail blindly.
+    seed = privateKey.subarray(2, 34);
+  } else if (privateKey.length === 32) {
+    // Bare seed with no DER wrapper.
+    seed = privateKey;
+  } else {
+    throw new Error("Invalid private key: unexpected structure");
+  }
+
+  return new Uint8Array(seed);
 }
 
 export function savePrivateKeyEd25519(
@@ -461,7 +516,10 @@ export function savePrivateKeyEd25519(
   if (key.length != 32)
     throw new Error("The private key must by 32 bytes in length");
 
-  if (password) throw new Error("not implemented");
+  if (password)
+    throw new Error(
+      "savePrivateKeyEd25519 only writes unencrypted keys. Encrypt them with a tool such as `openssl pkcs8 -topk8 -cipher AES-256-CBC`.",
+    );
 
   // From : https://github.com/PeculiarVentures/asn1-schema/issues/82
 
@@ -649,9 +707,17 @@ export class CertificateStore {
 
 export type GenerateCsrResult = {
   csr: string;
+  privateKeyPem: string;
+  privateKey: Uint8Array;
+  publicKey: Uint8Array;
   keys: CryptoKeyPair;
 };
 
+/**
+ * Generate a new Ed25519 keypair and a certificate signing request for it.
+ * @param username Subject common name (CN).
+ * @param userId Optional MilleGrilles user id, added as a custom extension.
+ */
 export async function generateCsr(
   username: string,
   userId?: string,
@@ -685,7 +751,97 @@ export async function generateCsr(
     extensions,
   });
 
-  return { csr: csr.toString(), keys };
+  const pkcs8Der = new Uint8Array(
+    await crypto.subtle.exportKey("pkcs8", keys.privateKey),
+  );
+  const publicKey = new Uint8Array(
+    await crypto.subtle.exportKey("raw", keys.publicKey),
+  );
+  if (publicKey.length !== 32)
+    throw new Error("Unexpected Ed25519 public key length");
+
+  return {
+    csr: csr.toString(),
+    privateKeyPem: derToPrivateKeyPem(pkcs8Der),
+    privateKey: extractEd25519Seed(pkcs8Der),
+    publicKey,
+    keys,
+  };
+}
+
+export type VerifyCsrResult = {
+  commonName: string;
+  userId?: string;
+  publicKeyHex: string;
+};
+
+/**
+ * Verify a certificate signing request's self-signature and read back its subject.
+ * @param pem CSR PEM.
+ * @returns The common name, the MilleGrilles userId when present, and the CSR's
+ * public key in hex.
+ * @throws If the signature is invalid or the common name is missing.
+ */
+export async function verifyCsr(pem: string): Promise<VerifyCsrResult> {
+  const csr = new Pkcs10CertificateRequest(pem);
+
+  if (csr.signatureAlgorithm.name !== "Ed25519")
+    throw new Error(
+      `Unsupported CSR signature algorithm: ${csr.signatureAlgorithm.name}`,
+    );
+
+  if (!(await verifyCsrSignature(csr))) throw new Error("Invalid CSR");
+
+  const commonName = csr.subjectName.getField("CN")[0];
+  if (!commonName) throw new Error("Username missing from the CSR");
+
+  const userIdExtension = csr.extensions.find((ext) => ext.type === OID_USERID);
+  const userId = userIdExtension
+    ? new TextDecoder().decode(userIdExtension.value)
+    : undefined;
+
+  const publicKeyRaw = new Uint8Array(csr.publicKey.rawData);
+
+  return {
+    commonName,
+    userId,
+    publicKeyHex: encodeHex(publicKeyRaw.subarray(publicKeyRaw.byteLength - 32)),
+  };
+}
+
+/**
+ * Verify the CSR self-signature, falling back on libsodium when Subtle does not
+ * support Ed25519 (same strategy as certificate verification).
+ */
+async function verifyCsrSignature(
+  csr: Pkcs10CertificateRequest,
+): Promise<boolean> {
+  const signature = new Uint8Array(csr.signature);
+  // Re-serialize the certificationRequestInfo: that is exactly what was signed.
+  const asn = AsnConvert.parse(csr.rawData, CertificationRequest);
+  const tbs = new Uint8Array(AsnConvert.serialize(asn.certificationRequestInfo));
+
+  if (subtleModeEd25519) {
+    try {
+      const publicKey = await csr.publicKey.export();
+      return await crypto.subtle.verify("Ed25519", publicKey, signature, tbs);
+    } catch (err) {
+      // Subtle lacks Ed25519: remember it and use libsodium from now on.
+      subtleModeEd25519 = false;
+    }
+  }
+
+  // Strip the ASN.1/SPKI framing: the raw Ed25519 key is the last 32 bytes.
+  const rawKey = new Uint8Array(csr.publicKey.rawData);
+  try {
+    return await verifyMessageSignature(
+      rawKey.subarray(rawKey.byteLength - 32),
+      tbs,
+      signature,
+    );
+  } catch (err) {
+    return false;
+  }
 }
 
 export type SplitPemResult = {"key": string | null, "chain": string[]}

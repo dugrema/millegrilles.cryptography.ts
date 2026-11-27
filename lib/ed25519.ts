@@ -91,9 +91,14 @@ export async function newMessageSigningKey(privateKey: Uint8Array, certificate: 
     return new MessageSigningKey(keypair, certificate)
 }
 
-export async function loadSigningKeyFromPems(privateKeyPem: string, certificateChain: string, caPem: string) {
+export async function loadSigningKeyFromPems(
+    privateKeyPem: string,
+    certificateChain: string,
+    caPem: string,
+    password?: string,
+) {
     let certificatChainList = splitCertificatePems(certificateChain);
     let certificateWrapper = wrapperFromPems(certificatChainList, caPem);
-    let privateKey = loadPrivateKeyEd25519(privateKeyPem);
+    let privateKey = await loadPrivateKeyEd25519(privateKeyPem, password);
     return await newMessageSigningKey(privateKey, certificateWrapper);
 }

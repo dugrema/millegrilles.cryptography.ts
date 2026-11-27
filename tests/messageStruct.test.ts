@@ -130,7 +130,7 @@ test('create encrypted response', async () => {
     expect(message.certificat).toStrictEqual(CERTIFICATE_1);
 
     // Decrypt the message
-    let privateKey = loadPrivateKeyEd25519(PRIVATE_KEY_1);
+    let privateKey = await loadPrivateKeyEd25519(PRIVATE_KEY_1);
     let decryptionKey = await newMessageSigningKey(privateKey, certificateWrapper);
     let cleartextContent = await message.getContent(decryptionKey);
     
@@ -158,7 +158,7 @@ test('create encrypted command', async () => {
     expect(message.certificat).toStrictEqual(CERTIFICATE_1);
 
     // Decrypt the message
-    let privateKey = loadPrivateKeyEd25519(PRIVATE_KEY_1);
+    let privateKey = await loadPrivateKeyEd25519(PRIVATE_KEY_1);
     let decryptionKey = await newMessageSigningKey(privateKey, certificateWrapper);
     let cleartextContent = await message.getContent(decryptionKey);
     
@@ -168,7 +168,7 @@ test('create encrypted command', async () => {
 
 test('serialize-deserialize message', async () => {
     let certificateWrapper = wrapperFromPems(CERTIFICATE_1)
-    let privateKey = loadPrivateKeyEd25519(PRIVATE_KEY_1);
+    let privateKey = await loadPrivateKeyEd25519(PRIVATE_KEY_1);
     let signingKey = await newMessageSigningKey(privateKey, certificateWrapper);
     let content = {value: "DUMMY content", n: 18, b: true, sub: {b: 12, a: "More text"}};
     let routing: Routage = {domaine: "DUMMY domain", action: "DUMMY ACTION"};
@@ -217,7 +217,7 @@ test('encrypted response decompression bomb is bounded (#8)', async () => {
     // Ciphertext stays tiny even though the plaintext is >10 MB.
     expect(message.contenu.length).toBeLessThan(1_000_000);
 
-    let privateKey = loadPrivateKeyEd25519(PRIVATE_KEY_1);
+    let privateKey = await loadPrivateKeyEd25519(PRIVATE_KEY_1);
     let decryptionKey = await newMessageSigningKey(privateKey, certificateWrapper);
     await expect(message.getContent(decryptionKey)).rejects.toThrow(
         "Decompressed content exceeds maximum allowed size",

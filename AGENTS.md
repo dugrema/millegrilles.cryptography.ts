@@ -19,7 +19,7 @@ It is written in TypeScript, builds to ES2020 modules, and is designed to run bo
   - [Multiencoding](#multiencoding)
   - [Random](#random)
   - [X25519](#x25519)
-  - [CSR / PrivateKey Generation](#csr--privatekey-generation)
+  - [CSR & Private Keys](#csr--private-keys)
 - [Examples](#examples)
 - [Testing](#testing)
 - [License](#license)
@@ -158,12 +158,30 @@ Ephemeral key exchange helpers (X25519 + Ed25519 integration).
 
 *See `lib/x25519.ts`.*
 
-### CSR / PrivateKey Generation
+### CSR & Private Keys
 
-- `forgeCsr`: generate a CSR from a keypair.
-- `forgePrivateKey`: generate a new Ed25519 private key.
+All CSR and private key handling lives in `lib/certificates.ts` (built on
+`@peculiar/x509` and WebCrypto — there is no node-forge dependency any more).
 
-*See `lib/forgeCsr.ts` & `lib/forgePrivateKey.ts`.*
+- `generateCsr(username, userId?)` – generate an Ed25519 keypair and a signed CSR;
+  returns `{ csr, privateKeyPem, privateKey, publicKey, keys }`.
+- `verifyCsr(pem)` – check the CSR self-signature and return
+  `{ commonName, userId?, publicKeyHex }`.
+- `loadPrivateKeyEd25519(pem, password?)` – load a PKCS#8 key, decrypting
+  `ENCRYPTED PRIVATE KEY` blocks (PBES2 / PBKDF2 + AES-128/192/256-CBC, password read as
+  UTF-8). Returns the 32-byte seed.
+- `loadPrivateKeyPem(pem, password?)` – same, returning the plain PKCS#8 PEM.
+- `isEncryptedPrivateKeyPem(pem)` – whether a keyfile needs a password.
+- `savePrivateKeyEd25519(key)` – write an **unencrypted** PKCS#8 PEM (encrypted output is
+  left to `openssl pkcs8 -topk8`).
+
+The PBES2 parser is `lib/pkcs8.ts`: a bounded DER reader that rejects DES/3DES/PBES1,
+indefinite lengths, truncated elements and runaway PBKDF2 iteration counts.
+
+Consumer apps migrating off the removed `forgeCsr` / `forgePrivateKey` namespaces:
+see `docs/migration-notes.md`.
+
+*See `lib/certificates.ts` & `lib/pkcs8.ts`.*
 
 ---
 
